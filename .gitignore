@@ -146,3 +146,5 @@ docker-compose.*.yml
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+*/sucio.md
