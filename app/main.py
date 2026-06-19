@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.farms import router as farms_router
 
 
 app = FastAPI(
@@ -19,7 +20,7 @@ app = FastAPI(
 
 
 app.include_router(auth_router)
-
+app.include_router(farms_router)
 
 @app.get("/health")
 async def health():
