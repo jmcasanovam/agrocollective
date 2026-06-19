@@ -2,6 +2,7 @@ from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy import Boolean
 
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -23,15 +24,18 @@ class Plot(Base, BaseModelMixin):
     )
 
     crop_type: Mapped[str] = mapped_column(
-        String(100)
+        String(100),
+        nullable=False
     )
 
     soil_type: Mapped[str] = mapped_column(
-        String(100)
+        String(100),
+        nullable=False
     )
 
     area_ha: Mapped[float] = mapped_column(
-        Float
+        Float,
+        nullable=False
     )
 
     depth_cm: Mapped[int | None] = mapped_column(
@@ -42,6 +46,17 @@ class Plot(Base, BaseModelMixin):
         String(100)
     )
 
+    name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+    
     farm = relationship(
         "Farm",
         back_populates="plots"

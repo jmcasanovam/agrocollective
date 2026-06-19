@@ -1,16 +1,32 @@
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+
+from pydantic import BaseModel
+from pydantic import EmailStr
+from pydantic import ConfigDict
+
 
 class UserBase(BaseModel):
     email: EmailStr
-    region: Optional[str] = None
+    region: str | None = None
+
 
 class UserCreate(UserBase):
     password: str
 
-class UserRead(UserBase):
-    id: UUID
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
-    class Config:
-        from_attributes = True
+
+class UserResponse(UserBase):
+    id: UUID
+    is_active: bool
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
