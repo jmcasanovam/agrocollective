@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import String, Boolean
 
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -28,7 +28,14 @@ class User(Base, BaseModelMixin):
         nullable=True
     )
 
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
     farms = relationship(
         "Farm",
-        back_populates="user"
+        back_populates="user",
+        cascade="all, delete-orphan"
     )

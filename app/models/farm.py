@@ -22,7 +22,8 @@ class Farm(Base, BaseModelMixin):
     )
 
     name: Mapped[str] = mapped_column(
-        String(255)
+        String(255),
+        nullable=False
     )
 
     latitude: Mapped[float | None] = mapped_column(
@@ -37,8 +38,9 @@ class Farm(Base, BaseModelMixin):
         String(100)
     )
 
-    area_ha: Mapped[float | None] = mapped_column(
-        Float
+    area_ha: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
     )
 
     user = relationship(
@@ -48,5 +50,6 @@ class Farm(Base, BaseModelMixin):
 
     plots = relationship(
         "Plot",
-        back_populates="farm"
+        back_populates="farm",
+        cascade="all, delete-orphan"
     )
