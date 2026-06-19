@@ -1,21 +1,85 @@
-# app/services/user_service.py
 from sqlalchemy.orm import Session
-from app.repositories.user_repository import UserRepository
+
+from fastapi import HTTPException
+from fastapi import status
+
 from app.schemas.user import UserCreate
-from fastapi import HTTPException, status
+from app.schemas.user import UserLogin
+from app.schemas.user import TokenResponse
 
-class UserService:
+from app.repositories.user_repository import user_repository
 
-    def __init__(self):
-        self.repo = UserRepository()
+from app.core.security import hash_password
+from app.core.security import verify_password
+from app.core.security import create_access_token
 
-    def create_user(self, db: Session, data: UserCreate):
-        if self.repo.get_by_email(db, data.email):
+
+class AuthService:
+
+    def register(
+        self,
+        db: Session,
+        user_data: UserCreate
+    ):
+
+        if user_repository.exists_by_email(
+            db,
+            user_data.email
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
-        return self.repo.create(db, data)
 
-    def list_users(self, db: Session):
-        return self.repo.list(db)
+        password_hash = hash_password(
+            user_data.password
+        )
+
+        return user_repository.create(
+            db,
+            user_data,
+            password_hash
+        )
+
+    def login(
+        self,
+        db: Session,
+        credentials: UserLogin
+    ) -> TokenResponse:
+
+        user = user_repository.get_by_email(
+            db,
+            credentials.email
+        )
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+
+        if not verify_password(
+            credentials.password,
+            user.password_hash
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User disabled"
+            )
+
+        token = create_access_token(
+            str(user.id)
+        )
+
+        return TokenResponse(
+            access_token=token
+        )
+
+
+auth_service = AuthService()

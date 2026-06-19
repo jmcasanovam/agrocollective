@@ -1,19 +1,25 @@
-# app/main.py
-from datetime import datetime, UTC
-from fastapi import Depends, FastAPI
-from sqlalchemy.orm import Session
+from datetime import UTC
+from datetime import datetime
+
+from fastapi import FastAPI
+from fastapi import Depends
+
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
-from app.schemas.user import UserCreate, UserRead
-from app.services.auth.auth_service import UserService
+
+from app.api.routes.auth import router as auth_router
+
 
 app = FastAPI(
     title="AgroCollective API",
     version="0.1.0"
 )
 
-user_service = UserService()
+
+app.include_router(auth_router)
+
 
 @app.get("/health")
 async def health():
@@ -22,18 +28,13 @@ async def health():
         "timestamp": datetime.now(UTC).isoformat()
     }
 
-@app.get("/health/db")
-async def database_health(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
-    return {"database": "connected"}
 
-@app.post("/users", response_model=UserRead)
-def create_user(
-    data: UserCreate,
+@app.get("/health/db")
+async def database_health(
     db: Session = Depends(get_db)
 ):
-    return user_service.create_user(db, data)
+    db.execute(text("SELECT 1"))
 
-@app.get("/users", response_model=list[UserRead])
-def list_users(db: Session = Depends(get_db)):
-    return user_service.list_users(db) 
+    return {
+        "database": "connected"
+    }
