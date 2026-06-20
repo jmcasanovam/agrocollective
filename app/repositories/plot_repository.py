@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.plot import Plot
 from app.models.farm import Farm
 
-from app.schemas.plot import PlotCreate
+from app.schemas.plot import PlotCreate, PlotUpdate
 
 
 class PlotRepository:
@@ -44,7 +44,9 @@ class PlotRepository:
         return (
             db.query(Plot)
             .filter(
-                Plot.farm_id == farm_id
+                Plot.farm_id == farm_id,
+                Plot.is_active.is_(True),
+                Farm.is_active.is_(True)
             )
             .all()
         )
@@ -59,7 +61,8 @@ class PlotRepository:
         return (
             db.query(Plot)
             .filter(
-                Plot.id == plot_id
+                Plot.id == plot_id,
+                Plot.is_active.is_(True)
             )
             .first()
         )
@@ -77,10 +80,55 @@ class PlotRepository:
             .join(Farm)
             .filter(
                 Plot.id == plot_id,
-                Farm.user_id == user_id
+                Plot.is_active.is_(True),
+                Farm.user_id == user_id,
+                Farm.is_active.is_(True)
             )
             .first()
         )
+
+
+    def update(
+        self,
+        db: Session,
+        plot: Plot,
+        plot_data: PlotUpdate
+    ) -> Plot:
+
+        if plot_data.crop_type is not None:
+            plot.crop_type = plot_data.crop_type
+
+        if plot_data.soil_type is not None:
+            plot.soil_type = plot_data.soil_type
+
+        if plot_data.area_ha is not None:
+            plot.area_ha = plot_data.area_ha
+
+        if plot_data.depth_cm is not None:
+            plot.depth_cm = plot_data.depth_cm
+
+        if plot_data.province is not None:
+            plot.province = plot_data.province
+
+        if plot_data.name is not None:
+            plot.name = plot_data.name
+
+
+        db.commit()
+        db.refresh(plot)
+
+        return plot
+
+
+    def delete(
+        self,
+        db: Session,
+        plot: Plot
+    ) -> None:
+
+        plot.is_active = False
+
+        db.commit()
 
 
 plot_repository = PlotRepository()

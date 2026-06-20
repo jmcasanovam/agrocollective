@@ -40,6 +40,16 @@ class SensorResponse(SensorBase):
 
     last_reading: datetime | None
 
+    is_active: bool
+
     model_config = ConfigDict(
         from_attributes=True
     )
+
+class SensorUpdate(BaseModel):
+
+    sensor_type: SensorType | None = None
+
+    depth_cm: int | None = None
+
+    status: str | None = None

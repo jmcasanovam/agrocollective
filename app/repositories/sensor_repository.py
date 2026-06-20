@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.sensor import Sensor
 from app.models.plot import Plot
 from app.models.farm import Farm
-from app.schemas.sensor import SensorCreate
+from app.schemas.sensor import SensorCreate, SensorUpdate
 
 
 class SensorRepository:
@@ -41,7 +41,8 @@ class SensorRepository:
         return (
             db.query(Sensor)
             .filter(
-                Sensor.id == sensor_id
+                Sensor.id == sensor_id,
+                Sensor.is_active == True
             )
             .first()
         )
@@ -60,7 +61,10 @@ class SensorRepository:
             .join(Farm)
             .filter(
                 Sensor.id == sensor_id,
-                Farm.user_id == user_id
+                Farm.user_id == user_id,
+                Sensor.is_active == True,
+                Plot.is_active == True,
+                Farm.is_active == True
             )
             .first()
         )
@@ -75,7 +79,8 @@ class SensorRepository:
         return (
             db.query(Sensor)
             .filter(
-                Sensor.esp32_id == esp32_id
+                Sensor.esp32_id == esp32_id,
+                Sensor.is_active == True
             )
             .first()
         )
@@ -94,10 +99,46 @@ class SensorRepository:
             .join(Farm)
             .filter(
                 Sensor.plot_id == plot_id,
-                Farm.user_id == user_id
+                Farm.user_id == user_id,
+                Sensor.is_active == True,
+                Plot.is_active == True,
+                Farm.is_active == True
             )
             .all()
         )
+
+
+    def update(
+        self,
+        db: Session,
+        sensor: Sensor,
+        sensor_data: SensorUpdate
+    ):
+
+        if sensor_data.sensor_type is not None:
+            sensor.sensor_type = sensor_data.sensor_type
+
+        if sensor_data.depth_cm is not None:
+            sensor.depth_cm = sensor_data.depth_cm
+
+        if sensor_data.status is not None:
+            sensor.status = sensor_data.status
+
+        db.commit()
+        db.refresh(sensor)
+
+        return sensor
+
+
+    def delete(
+        self,
+        db: Session,
+        sensor: Sensor
+    ):
+
+        sensor.is_active = False
+
+        db.commit()
 
 
 sensor_repository = SensorRepository()

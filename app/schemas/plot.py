@@ -34,3 +34,17 @@ class PlotResponse(PlotBase):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+class PlotUpdate(BaseModel):
+
+    crop_type: str | None = None
+
+    soil_type: str | None = None
+
+    area_ha: float | None = None
+
+    depth_cm: int | None = None
+
+    province: str | None = None
+
+    name: str | None = None
