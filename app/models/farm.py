@@ -1,3 +1,4 @@
+from sqlalchemy import Boolean
 from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy import String
@@ -40,6 +41,12 @@ class Farm(Base, BaseModelMixin):
 
     area_ha: Mapped[float] = mapped_column(
         Float,
+        nullable=False
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
         nullable=False
     )
 

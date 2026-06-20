@@ -53,5 +53,6 @@ def get_sensors(
 
     return sensor_service.get_all(
         db,
-        plot_id
+        plot_id,
+        current_user.id
     )
