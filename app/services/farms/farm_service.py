@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.repositories.farm_repository import farm_repository
 
 from app.schemas.farm import FarmCreate
+from app.schemas.farm import FarmUpdate
 
 
 class FarmService:
@@ -59,6 +60,58 @@ class FarmService:
             )
 
         return farm
+
+
+    def update(
+        self,
+        db: Session,
+        farm_id: UUID,
+        farm_data: FarmUpdate,
+        user_id: UUID
+    ):
+
+        farm = farm_repository.get_by_id(
+            db,
+            farm_id,
+            user_id
+        )
+
+        if not farm:
+            raise HTTPException(
+                status_code=404,
+                detail="Farm not found"
+            )
+
+        return farm_repository.update(
+            db,
+            farm,
+            farm_data
+        )
+
+
+    def delete(
+        self,
+        db: Session,
+        farm_id: UUID,
+        user_id: UUID
+    ):
+
+        farm = farm_repository.get_by_id(
+            db,
+            farm_id,
+            user_id
+        )
+
+        if not farm:
+            raise HTTPException(
+                status_code=404,
+                detail="Farm not found"
+            )
+
+        farm_repository.delete(
+            db,
+            farm
+        )
 
 
 farm_service = FarmService()
