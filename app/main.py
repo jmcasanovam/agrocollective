@@ -12,6 +12,7 @@ from app.core.dependencies import get_db
 from app.api.routes.auth import router as auth_router
 from app.api.routes.farms import router as farms_router
 from app.api.routes.plots import router as plots_router
+from app.api.routes.sensors import router as sensors_router
 
 
 app = FastAPI(
@@ -23,6 +24,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(farms_router)
 app.include_router(plots_router)
+app.include_router(sensors_router)
 
 @app.get("/health")
 async def health():

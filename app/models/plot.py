@@ -61,3 +61,9 @@ class Plot(Base, BaseModelMixin):
         "Farm",
         back_populates="plots"
     )
+
+    sensors = relationship(
+        "Sensor",
+        back_populates="plot",
+        cascade="all, delete-orphan"
+    )
