@@ -4,6 +4,7 @@ from sqlalchemy import String
 from sqlalchemy import Integer
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+from sqlalchemy import Boolean
 
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -51,6 +52,12 @@ class Sensor(Base, BaseModelMixin):
 
     last_reading: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False
     )
 
     plot = relationship(

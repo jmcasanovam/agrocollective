@@ -22,9 +22,10 @@ class SensorService:
         user_id: UUID
     ):
 
-        plot = plot_repository.get_by_id(
+        plot = plot_repository.get_by_id_and_user(
             db,
-            plot_id
+            plot_id,
+            user_id
         )
 
         if not plot:
@@ -56,24 +57,39 @@ class SensorService:
     def get_all(
         self,
         db: Session,
-        plot_id: UUID
+        plot_id: UUID,
+        user_id: UUID
     ):
+        plot = plot_repository.get_by_id_and_user(
+            db,
+            plot_id,
+            user_id
+        )
+
+        if not plot:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Plot not found"
+            )
 
         return sensor_repository.get_all_by_plot(
             db,
-            plot_id
+            plot_id,
+            user_id
         )
 
 
     def get_by_id(
         self,
         db: Session,
-        sensor_id: UUID
+        sensor_id: UUID,
+        user_id: UUID
     ):
 
-        sensor = sensor_repository.get_by_id(
+        sensor = sensor_repository.get_by_id_and_user(
             db,
-            sensor_id
+            sensor_id,
+            user_id
         )
 
         if not sensor:

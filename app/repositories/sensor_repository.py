@@ -3,6 +3,8 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.sensor import Sensor
+from app.models.plot import Plot
+from app.models.farm import Farm
 from app.schemas.sensor import SensorCreate
 
 
@@ -45,6 +47,25 @@ class SensorRepository:
         )
 
 
+    def get_by_id_and_user(
+        self,
+        db: Session,
+        sensor_id: UUID,
+        user_id: UUID
+    ) -> Sensor | None:
+
+        return (
+            db.query(Sensor)
+            .join(Plot)
+            .join(Farm)
+            .filter(
+                Sensor.id == sensor_id,
+                Farm.user_id == user_id
+            )
+            .first()
+        )
+
+
     def get_by_esp32_id(
         self,
         db: Session,
@@ -63,13 +84,17 @@ class SensorRepository:
     def get_all_by_plot(
         self,
         db: Session,
-        plot_id: UUID
+        plot_id: UUID,
+        user_id: UUID
     ) -> list[Sensor]:
 
         return (
             db.query(Sensor)
+            .join(Plot)
+            .join(Farm)
             .filter(
-                Sensor.plot_id == plot_id
+                Sensor.plot_id == plot_id,
+                Farm.user_id == user_id
             )
             .all()
         )
