@@ -74,7 +74,7 @@ class SensorRepository:
         self,
         db: Session,
         esp32_id: str
-    ) -> Sensor | None:
+    ) -> list[Sensor]:
 
         return (
             db.query(Sensor)
@@ -82,7 +82,7 @@ class SensorRepository:
                 Sensor.esp32_id == esp32_id,
                 Sensor.is_active == True
             )
-            .first()
+            .all()
         )
 
 

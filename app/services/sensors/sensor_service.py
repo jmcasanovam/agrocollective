@@ -35,25 +35,11 @@ class SensorService:
                 detail="Plot not found"
             )
 
-        existing_sensor = (
-            sensor_repository.get_by_esp32_id(
-                db,
-                sensor_data.esp32_id
-            )
-        )
-
-        if existing_sensor:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="ESP32 already registered"
-            )
-
         return sensor_repository.create(
             db,
             sensor_data,
             plot_id
         )
-
 
     def get_all(
         self,
