@@ -1,3 +1,4 @@
+import hashlib
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -10,7 +11,6 @@ from app.schemas.plot import PlotCreate, PlotUpdate
 
 class PlotRepository:
 
-
     def create(
         self,
         db: Session,
@@ -20,11 +20,11 @@ class PlotRepository:
 
         plot = Plot(
             farm_id=farm_id,
-            crop_type=plot_data.crop_type,
-            soil_type=plot_data.soil_type,
+            crop_id=plot_data.crop_id,
+            soil_id=plot_data.soil_id,
+            region_id=plot_data.region_id,
             area_ha=plot_data.area_ha,
             depth_cm=plot_data.depth_cm,
-            province=plot_data.province,
             name=plot_data.name
         )
 
@@ -32,8 +32,11 @@ class PlotRepository:
         db.commit()
         db.refresh(plot)
 
-        return plot
+        plot.hash_plot = hashlib.sha256(str(plot.id).encode()).hexdigest()
+        db.commit()
+        db.refresh(plot)
 
+        return plot
 
     def get_all_by_farm(
         self,
@@ -45,12 +48,10 @@ class PlotRepository:
             db.query(Plot)
             .filter(
                 Plot.farm_id == farm_id,
-                Plot.is_active.is_(True),
-                Farm.is_active.is_(True)
+                Plot.is_active.is_(True)
             )
             .all()
         )
-
 
     def get_by_id(
         self,
@@ -66,7 +67,6 @@ class PlotRepository:
             )
             .first()
         )
-
 
     def get_by_id_and_user(
         self,
@@ -87,7 +87,6 @@ class PlotRepository:
             .first()
         )
 
-
     def update(
         self,
         db: Session,
@@ -95,11 +94,14 @@ class PlotRepository:
         plot_data: PlotUpdate
     ) -> Plot:
 
-        if plot_data.crop_type is not None:
-            plot.crop_type = plot_data.crop_type
+        if plot_data.crop_id is not None:
+            plot.crop_id = plot_data.crop_id
 
-        if plot_data.soil_type is not None:
-            plot.soil_type = plot_data.soil_type
+        if plot_data.soil_id is not None:
+            plot.soil_id = plot_data.soil_id
+
+        if plot_data.region_id is not None:
+            plot.region_id = plot_data.region_id
 
         if plot_data.area_ha is not None:
             plot.area_ha = plot_data.area_ha
@@ -107,18 +109,13 @@ class PlotRepository:
         if plot_data.depth_cm is not None:
             plot.depth_cm = plot_data.depth_cm
 
-        if plot_data.province is not None:
-            plot.province = plot_data.province
-
         if plot_data.name is not None:
             plot.name = plot_data.name
-
 
         db.commit()
         db.refresh(plot)
 
         return plot
-
 
     def delete(
         self,
@@ -127,7 +124,6 @@ class PlotRepository:
     ) -> None:
 
         plot.is_active = False
-
         db.commit()
 
 
