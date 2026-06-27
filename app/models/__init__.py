@@ -4,9 +4,8 @@ from .plot import Plot
 from .crop import Crop
 from .soil import Soil
 from .region import Region
-from .phenological_phase import PhenologicalPhase
 from .device import Device
-from .irrigation_weekly import IrrigationWeekly
+from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
 
 __all__ = [
@@ -16,8 +15,7 @@ __all__ = [
     "Crop",
     "Soil",
     "Region",
-    "PhenologicalPhase",
     "Device",
-    "IrrigationWeekly",
+    "IrrigationRecord",
     "Harvest",
 ]
