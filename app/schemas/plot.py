@@ -5,18 +5,11 @@ from pydantic import ConfigDict
 
 
 class PlotBase(BaseModel):
-
     crop_id: UUID
-
     soil_id: UUID
-
-    region_id: UUID
-
-    area_ha: float
-
-    depth_cm: int | None = None
-
-    name: str
+    name: str | None = None
+    area_ha: float | None = None
+    management_profile: str | None = None
 
 
 class PlotCreate(PlotBase):
@@ -24,26 +17,16 @@ class PlotCreate(PlotBase):
 
 
 class PlotResponse(PlotBase):
-
     id: UUID
-
     farm_id: UUID
-
-    is_active: bool
+    hash_plot: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class PlotUpdate(BaseModel):
-
     crop_id: UUID | None = None
-
     soil_id: UUID | None = None
-
-    region_id: UUID | None = None
-
-    area_ha: float | None = None
-
-    depth_cm: int | None = None
-
     name: str | None = None
+    area_ha: float | None = None
+    management_profile: str | None = None

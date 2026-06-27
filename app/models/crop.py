@@ -9,21 +9,7 @@ class Crop(Base, BaseModelMixin):
 
     __tablename__ = "crops"
 
-    name: Mapped[str] = mapped_column(
-        String(100),
-        unique=True,
-        nullable=False
-    )
-
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
 
-    plots = relationship(
-        "Plot",
-        back_populates="crop"
-    )
-
-    phenological_phases = relationship(
-        "PhenologicalPhase",
-        back_populates="crop",
-        cascade="all, delete-orphan"
-    )
+    plots = relationship("Plot", back_populates="crop")

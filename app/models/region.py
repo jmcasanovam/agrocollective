@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import Float, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -9,23 +9,10 @@ class Region(Base, BaseModelMixin):
 
     __tablename__ = "regions"
 
-    code: Mapped[str] = mapped_column(
-        String(20),
-        unique=True,
-        nullable=False
-    )
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    siar_station_code: Mapped[str | None] = mapped_column(String(10))
 
-    name: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    siar_station_code: Mapped[str] = mapped_column(
-        String(10),
-        nullable=False
-    )
-
-    plots = relationship(
-        "Plot",
-        back_populates="region"
-    )
+    farms = relationship("Farm", back_populates="region")
