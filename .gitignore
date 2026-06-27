@@ -127,6 +127,7 @@ desktop.ini
 # dotenv
 .env
 .env.*
+!.env.example
 
 # Secret keys and credentials
 secrets.yml
