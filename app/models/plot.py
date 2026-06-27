@@ -1,14 +1,7 @@
-from sqlalchemy import Float
-from sqlalchemy import ForeignKey
-from sqlalchemy import Integer
-from sqlalchemy import String
-from sqlalchemy import Boolean
+from uuid import UUID as PyUUID
 
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
-
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Float, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 from app.models.mixins import BaseModelMixin
@@ -18,52 +11,18 @@ class Plot(Base, BaseModelMixin):
 
     __tablename__ = "plots"
 
-    farm_id: Mapped[UUID] = mapped_column(
-        ForeignKey("farms.id"),
-        nullable=False
-    )
+    farm_id: Mapped[PyUUID] = mapped_column(ForeignKey("farms.id"), nullable=False)
+    crop_id: Mapped[PyUUID] = mapped_column(ForeignKey("crops.id"), nullable=False)
+    soil_id: Mapped[PyUUID] = mapped_column(ForeignKey("soils.id"), nullable=False)
 
-    crop_type: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
+    name: Mapped[str | None] = mapped_column(String(150))
+    area_ha: Mapped[float | None] = mapped_column(Float)
+    hash_plot: Mapped[str | None] = mapped_column(String(64))
+    management_profile: Mapped[str | None] = mapped_column(String(20))
 
-    soil_type: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    area_ha: Mapped[float] = mapped_column(
-        Float,
-        nullable=False
-    )
-
-    depth_cm: Mapped[int | None] = mapped_column(
-        Integer
-    )
-
-    province: Mapped[str | None] = mapped_column(
-        String(100)
-    )
-
-    name: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        nullable=False
-    )
-    
-    farm = relationship(
-        "Farm",
-        back_populates="plots"
-    )
-
-    sensors = relationship(
-        "Sensor",
-        back_populates="plot",
-        cascade="all, delete-orphan"
-    )
+    farm = relationship("Farm", back_populates="plots")
+    crop = relationship("Crop", back_populates="plots")
+    soil = relationship("Soil", back_populates="plots")
+    devices = relationship("Device", back_populates="plot", cascade="all, delete-orphan")
+    irrigation_records = relationship("IrrigationRecord", back_populates="plot", cascade="all, delete-orphan")
+    harvests = relationship("Harvest", back_populates="plot", cascade="all, delete-orphan")
