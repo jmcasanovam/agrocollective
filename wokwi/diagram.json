@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "author": "AgroCollective",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 20,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -60,
+      "left": 300,
+      "attrs": {
+        "temperature": "22.5",
+        "humidity": "62"
+      }
+    },
+    {
+      "type": "wokwi-ds18b20",
+      "id": "ds1",
+      "top": 100,
+      "left": 310,
+      "attrs": {
+        "temperature": "19.5"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 80,
+      "left": 390,
+      "rotate": 90,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "soil-moisture-sensor",
+      "id": "soil1",
+      "top": 230,
+      "left": 300,
+      "attrs": {
+        "moisture": "45"
+      }
+    }
+  ],
+  "connections": [
+    ["esp:3V3",   "dht1:VCC", "red",    []],
+    ["esp:GND.1", "dht1:GND", "black",  []],
+    ["esp:D15",   "dht1:SDA", "green",  []],
+
+    ["esp:3V3",   "ds1:VDD",  "red",    []],
+    ["esp:GND.1", "ds1:GND",  "black",  []],
+    ["esp:D5",    "ds1:DQ",   "green",  []],
+    ["r1:1",      "esp:3V3",  "red",    []],
+    ["r1:2",      "ds1:DQ",   "green",  []],
+
+    ["esp:3V3",   "soil1:VCC",  "red",    []],
+    ["esp:GND.1", "soil1:GND",  "black",  []],
+    ["esp:34",    "soil1:AOUT", "yellow", []]
+  ]
+}

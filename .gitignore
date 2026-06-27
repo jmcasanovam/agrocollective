@@ -147,4 +147,5 @@ docker-compose.*.yml
 !.vscode/launch.json
 !.vscode/extensions.json
 
-*/sucio.md
+*/sucio.md.agents/
+skills-lock.*

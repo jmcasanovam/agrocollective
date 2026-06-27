@@ -5,16 +5,11 @@ from pydantic import ConfigDict
 
 
 class FarmBase(BaseModel):
-
     name: str
-
+    region_id: UUID | None = None
     latitude: float | None = None
-
     longitude: float | None = None
-
-    province: str | None = None
-
-    area_ha: float
+    area_ha: float | None = None
 
 
 class FarmCreate(FarmBase):
@@ -22,23 +17,15 @@ class FarmCreate(FarmBase):
 
 
 class FarmResponse(FarmBase):
-
     id: UUID
-
     user_id: UUID
 
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
+
 
 class FarmUpdate(BaseModel):
-
     name: str | None = None
-
+    region_id: UUID | None = None
     latitude: float | None = None
-
     longitude: float | None = None
-
-    province: str | None = None
-
     area_ha: float | None = None

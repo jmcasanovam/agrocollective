@@ -10,33 +10,33 @@ from app.core.dependencies import get_current_user
 
 from app.models.user import User
 
-from app.schemas.sensor import SensorCreate
-from app.schemas.sensor import SensorUpdate
-from app.schemas.sensor import SensorResponse
+from app.schemas.device import DeviceCreate
+from app.schemas.device import DeviceUpdate
+from app.schemas.device import DeviceResponse
 
-from app.services.sensors.sensor_service import sensor_service
+from app.services.devices.device_service import device_service
 
 
 router = APIRouter(
-    prefix="/plots/{plot_id}/sensors",
-    tags=["Sensors"]
+    prefix="/plots/{plot_id}/devices",
+    tags=["Devices"]
 )
 
 
 @router.post(
     "",
-    response_model=SensorResponse
+    response_model=DeviceResponse
 )
-def create_sensor(
+def create_device(
     plot_id: UUID,
-    sensor_data: SensorCreate,
+    device_data: DeviceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    return sensor_service.create(
+    return device_service.create(
         db,
-        sensor_data,
+        device_data,
         plot_id,
         current_user.id
     )
@@ -44,15 +44,15 @@ def create_sensor(
 
 @router.get(
     "",
-    response_model=list[SensorResponse]
+    response_model=DeviceResponse
 )
-def get_sensors(
+def get_device(
     plot_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    return sensor_service.get_all(
+    return device_service.get_by_plot(
         db,
         plot_id,
         current_user.id
@@ -60,59 +60,58 @@ def get_sensors(
 
 
 @router.put(
-    "/{sensor_id}",
-    response_model=SensorResponse
+    "/{device_id}",
+    response_model=DeviceResponse
 )
-def update_sensor(
+def update_device(
     plot_id: UUID,
-    sensor_id: UUID,
-    sensor_data: SensorUpdate,
+    device_id: UUID,
+    device_data: DeviceUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    return sensor_service.update(
+    return device_service.update(
         db,
-        sensor_id,
-        sensor_data,
+        device_id,
+        device_data,
         current_user.id
     )
 
 
 @router.delete(
-    "/{sensor_id}"
+    "/{device_id}"
 )
-def delete_sensor(
+def delete_device(
     plot_id: UUID,
-    sensor_id: UUID,
+    device_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    sensor_service.delete(
+    device_service.delete(
         db,
-        sensor_id,
+        device_id,
         plot_id,
         current_user.id
     )
 
-    return {
-        "message": "Sensor deleted"
-    }
+    return {"message": "Device deleted"}
+
 
 @router.get(
-    "/{sensor_id}",
-    response_model=SensorResponse
+    "/{device_id}",
+    response_model=DeviceResponse
 )
-def get_sensor(
+def get_device_by_id(
     plot_id: UUID,
-    sensor_id: UUID,
+    device_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    return sensor_service.get_by_id(
+    return device_service.get_by_id(
         db,
-        sensor_id,
+        device_id,
         current_user.id
     )
