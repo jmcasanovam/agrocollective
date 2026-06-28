@@ -20,7 +20,9 @@ import argparse
 import logging
 import os
 import sys
+import time
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 import httpx
 import pandas as pd
@@ -36,6 +38,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
+# httpx loguea la URL completa incluyendo el token — lo silenciamos
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 # ------------------------------------------------------------------ #
@@ -44,9 +49,9 @@ log = logging.getLogger(__name__)
 
 BASE_URL    = "https://servicio.mapa.gob.es/siarapi"
 ENDPOINT    = f"{BASE_URL}/API/V1/Datos/Diarios/ESTACION"
-DATE_START  = date(2025, 5, 1)
+DATE_START  = date(2025, 6, 28)   # token SiAR autorizado desde ~12 meses atrás
 DATE_END    = date(2025, 10, 31)
-EXPECTED_DAYS = (DATE_END - DATE_START).days + 1  # 184
+EXPECTED_DAYS = (DATE_END - DATE_START).days + 1  # 126
 
 STATION_REGION = {"V17": "VALENCIA", "GR01": "BAZA"}
 
@@ -63,8 +68,8 @@ FIELD_MAP = {
 SUM_FIELDS  = {"eto", "pe", "precipitation"}   # suma semanal
 MEAN_FIELDS = {"air_temp", "relative_humidity"} # media semanal
 
-ETO_WARN_MAX = 12.0  # mm/día — valor sospechoso si se supera
-MAX_INTERP_GAP = 2   # días — huecos <= esto se interpolan linealmente
+ETO_WARN_MAX = 12.0  # mm/día: valor sospechoso si se supera
+MAX_INTERP_GAP = 2   # días: huecos <= esto se interpolan linealmente
 
 FLUX_TASK_NAME = "weather_weekly_downsampling"
 
@@ -73,73 +78,98 @@ FLUX_TASK_NAME = "weather_weekly_downsampling"
 # Configuración                                                        #
 # ------------------------------------------------------------------ #
 
-def load_config() -> dict:
-    required = [
-        "SIAR_TOKEN",
-        "INFLUXDB_HOST", "INFLUXDB_PORT",
-        "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET",
-    ]
+def load_config(dry_run: bool = False) -> dict:
+    always_required = ["SIAR_TOKEN"]
+    influx_required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET"]
+    required = always_required if dry_run else always_required + influx_required
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         log.error("Variables de entorno faltantes: %s", ", ".join(missing))
         sys.exit(1)
 
-    return {
-        "siar_token":    os.environ["SIAR_TOKEN"],
-        "influx_url":    f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}",
-        "influx_token":  os.environ["INFLUXDB_TOKEN"],
-        "influx_org":    os.environ["INFLUXDB_ORG"],
-        "influx_bucket": os.environ["INFLUXDB_BUCKET"],
-    }
+    cfg: dict = {"siar_token": os.environ["SIAR_TOKEN"]}
+    if not dry_run:
+        cfg.update({
+            "influx_url":    f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}",
+            "influx_token":  os.environ["INFLUXDB_TOKEN"],
+            "influx_org":    os.environ["INFLUXDB_ORG"],
+            "influx_bucket": os.environ["INFLUXDB_BUCKET"],
+        })
+    return cfg
 
 
 # ------------------------------------------------------------------ #
 # Descarga                                                            #
 # ------------------------------------------------------------------ #
 
-def download_siar(cfg: dict) -> pd.DataFrame:
-    """
-    Descarga datos diarios de todas las estaciones en una sola llamada.
-    Nunca loguea la URL completa ni el token.
-    """
-    params = [
-        ("token",           cfg["siar_token"]),
+_CHUNK_DAYS = 28  # API SiAR limita el rango por petición; 28 días es seguro
+
+
+_RETRY_DELAYS = [30, 60, 120]  # backoff en segundos ante 429/403 por rate-limit
+
+
+def _fetch_chunk(cfg: dict, chunk_start: date, chunk_end: date) -> list:
+    """Descarga un chunk de días con retry ante rate-limit. Nunca loguea el token."""
+    other_qs = urlencode([
         ("Id",              "V17"),
         ("Id",              "GR01"),
-        ("FechaInicial",    DATE_START.isoformat()),
-        ("FechaFinal",      DATE_END.isoformat()),
+        ("FechaInicial",    chunk_start.isoformat()),
+        ("FechaFinal",      chunk_end.isoformat()),
         ("DatosCalculados", "true"),
-    ]
+    ], doseq=True)
+    url = f"{ENDPOINT}?token={cfg['siar_token']}&{other_qs}"
+    log.info("  chunk %s → %s", chunk_start, chunk_end)
 
-    safe_params = "&".join(
-        f"{k}={v}" if k != "token" else "token=***"
-        for k, v in params
-    )
-    log.info("GET %s?%s", ENDPOINT, safe_params)
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS, start=1):
+        if delay:
+            log.info("  rate-limit: esperando %ds antes del reintento %d…", delay, attempt)
+            time.sleep(delay)
+        try:
+            resp = httpx.get(url, timeout=60)
+        except httpx.RequestError as exc:
+            log.error("Error de red al contactar SiAR: %s", type(exc).__name__)
+            sys.exit(1)
 
-    try:
-        resp = httpx.get(ENDPOINT, params=params, timeout=60)
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        log.error("HTTP %s al contactar SiAR: %s", exc.response.status_code, exc)
+        if resp.status_code == 200:
+            body = resp.json()
+            msg = body.get("MensajeRespuesta")
+            if msg:
+                log.error("SiAR error en chunk %s→%s: %s", chunk_start, chunk_end, msg)
+                sys.exit(1)
+            return body.get("datos", [])
+
+        if resp.status_code in (403, 429) and attempt <= len(_RETRY_DELAYS):
+            continue  # reintenta con el siguiente delay
+
+        log.error("HTTP %s al contactar SiAR (chunk %s→%s)", resp.status_code, chunk_start, chunk_end)
         sys.exit(1)
-    except httpx.RequestError as exc:
-        log.error("Error de red: %s", exc)
-        sys.exit(1)
 
-    body = resp.json()
-    msg = body.get("MensajeRespuesta")
-    if msg:
-        log.error("SiAR devolvió error: %s", msg)
-        sys.exit(1)
+    log.error("Agotados los reintentos para chunk %s→%s.", chunk_start, chunk_end)
+    sys.exit(1)
 
-    datos = body.get("datos", [])
-    if not datos:
+
+def download_siar(cfg: dict) -> pd.DataFrame:
+    """
+    Descarga datos diarios en chunks de 28 días (límite de la API SiAR).
+    Nunca loguea la URL completa ni el token.
+    """
+    log.info("GET %s (chunks de %d días, %s → %s)", ENDPOINT, _CHUNK_DAYS, DATE_START, DATE_END)
+
+    all_datos: list = []
+    chunk_start = DATE_START
+    while chunk_start <= DATE_END:
+        chunk_end = min(chunk_start + timedelta(days=_CHUNK_DAYS - 1), DATE_END)
+        all_datos.extend(_fetch_chunk(cfg, chunk_start, chunk_end))
+        chunk_start = chunk_end + timedelta(days=1)
+        if chunk_start <= DATE_END:
+            time.sleep(15)  # evita rate-limit de la API SiAR (~1 req/10s)
+
+    if not all_datos:
         log.error("La respuesta SiAR no contiene registros. Abortando.")
         sys.exit(1)
 
-    log.info("Registros recibidos total: %d", len(datos))
-    return pd.DataFrame(datos)
+    log.info("Registros recibidos total: %d", len(all_datos))
+    return pd.DataFrame(all_datos)
 
 
 # ------------------------------------------------------------------ #
@@ -149,7 +179,7 @@ def download_siar(cfg: dict) -> pd.DataFrame:
 def validate_station(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
     """Valida, reporta y devuelve el DataFrame de la estación, o aborta."""
     log.info("")
-    log.info("── Validación %s (%s) ──────────────────────────", station_id, STATION_REGION[station_id])
+    log.info("** Validación %s (%s) **********************", station_id, STATION_REGION[station_id])
 
     if df.empty:
         log.error("Sin datos para %s. Abortando.", station_id)
@@ -172,13 +202,13 @@ def validate_station(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
         log.warning("  Días ausentes       : %d  %s", len(gaps), _fmt_gaps(gaps))
         if max_run > MAX_INTERP_GAP:
             log.error(
-                "  Hueco largo de %d días consecutivos — revisar manualmente. Abortando.",
+                "  Hueco largo de %d días consecutivos: revisar manualmente. Abortando.",
                 max_run,
             )
             sys.exit(1)
         log.info("  Hueco máximo %d día(s) ≤ %d → se interpolará.", max_run, MAX_INTERP_GAP)
     else:
-        log.info("  Huecos              : ninguno ✓")
+        log.info("  Huecos              : ninguno")
 
     # Nulos por campo
     log.info("  Nulos por campo:")
@@ -193,7 +223,7 @@ def validate_station(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
 
     if "EtPMon" not in df.columns or df["EtPMon"].isna().all():
         log.error(
-            "  EtPMon completamente nula — ¿falta DatosCalculados=true? Abortando."
+            "  EtPMon completamente nula: ¿falta DatosCalculados=true? Abortando."
         )
         sys.exit(1)
 
@@ -204,7 +234,7 @@ def validate_station(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
         eto.mean(), eto.max(), eto.min(),
     )
     if eto.max() > ETO_WARN_MAX:
-        log.warning("  EtPMon máximo %.2f > %.1f mm/día — verificar unidades.", eto.max(), ETO_WARN_MAX)
+        log.warning("  EtPMon máximo %.2f > %.1f mm/día: verificar unidades.", eto.max(), ETO_WARN_MAX)
 
     return df
 
@@ -249,7 +279,7 @@ def interpolate_gaps(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------ #
-# Puntos InfluxDB — weather (diario)                                  #
+# Puntos InfluxDB: weather (diario)                                  #
 # ------------------------------------------------------------------ #
 
 def to_daily_points(df: pd.DataFrame, station_id: str) -> list:
@@ -260,7 +290,7 @@ def to_daily_points(df: pd.DataFrame, station_id: str) -> list:
             Point("weather")
             .tag("region_code", region)
             .tag("siar_station_code", station_id)
-            .time(pd.Timestamp(row["Fecha"]).to_pydatetime(), WritePrecision.SECONDS)
+            .time(pd.Timestamp(row["Fecha"]).to_pydatetime(), WritePrecision.S)
         )
         for siar_field, influx_field in FIELD_MAP.items():
             val = row.get(siar_field)
@@ -271,7 +301,7 @@ def to_daily_points(df: pd.DataFrame, station_id: str) -> list:
 
 
 # ------------------------------------------------------------------ #
-# Puntos InfluxDB — weather_weekly (histórico, calculado en Python)   #
+# Puntos InfluxDB: weather_weekly (histórico calculado )             #
 # ------------------------------------------------------------------ #
 
 def to_weekly_points(df: pd.DataFrame, station_id: str) -> list:
@@ -294,7 +324,7 @@ def to_weekly_points(df: pd.DataFrame, station_id: str) -> list:
             Point("weather_weekly")
             .tag("region_code", region)
             .tag("siar_station_code", station_id)
-            .time(week_ts.to_pydatetime(), WritePrecision.SECONDS)
+            .time(week_ts.to_pydatetime(), WritePrecision.S)
         )
         for siar_field, influx_field in FIELD_MAP.items():
             if siar_field not in group.columns:
@@ -314,7 +344,7 @@ def to_weekly_points(df: pd.DataFrame, station_id: str) -> list:
 
 def write_influx(points: list, cfg: dict, label: str, dry_run: bool = False):
     if not points:
-        log.info("  [%s] 0 puntos — nada que escribir.", label)
+        log.info("  [%s] 0 puntos: nada que escribir.", label)
         return
     if dry_run:
         log.info("  [dry-run] %s: %d puntos listos (no se escriben).", label, len(points))
@@ -367,7 +397,8 @@ union(tables: [sumData, meanData])
 
 def setup_weekly_task(cfg: dict, dry_run: bool = False):
     """Crea o actualiza la Flux task de downsampling semanal en InfluxDB."""
-    flux = _FLUX_TASK.format(name=FLUX_TASK_NAME, bucket=cfg["influx_bucket"])
+    bucket = cfg.get("influx_bucket", "<bucket>")
+    flux = _FLUX_TASK.format(name=FLUX_TASK_NAME, bucket=bucket)
 
     if dry_run:
         log.info("[dry-run] Flux task no creada. Script Flux:")
@@ -420,7 +451,7 @@ def main():
     )
     args = parser.parse_args()
 
-    cfg = load_config()
+    cfg = load_config(dry_run=args.dry_run)
 
     # 1. Descarga
     df_all = download_siar(cfg)
