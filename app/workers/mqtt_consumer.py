@@ -26,6 +26,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 from datetime import datetime
 
 from app.services.mqtt.mqtt_service import build_client, TOPIC_READINGS
+from app.services.measurements.measurement_service import store_reading
 from app.database.postgres import SessionLocal
 from app.repositories.device_repository import device_repository
 
@@ -112,11 +113,17 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage) -> None:
             return
 
         logger.info(
-            "Lectura válida de '%s' | plot_id=%s | batería=%d mV | medidas=%s",
-            device_code, device.plot_id, payload.battery_mv, payload.measures.model_dump()
+            "Lectura recibida de '%s' | plot_id=%s | batería=%d mV",
+            device_code, device.plot_id, payload.battery_mv
         )
 
-        # Fase 2: aquí se llamará a measurement_service para persistir en InfluxDB
+        store_reading(
+            db=db,
+            device=device,
+            timestamp=payload.timestamp,
+            battery_mv=payload.battery_mv,
+            measures=payload.measures.model_dump(exclude_none=True),
+        )
 
     finally:
         db.close()
