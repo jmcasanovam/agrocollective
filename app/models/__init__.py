@@ -8,6 +8,7 @@ from .device import Device
 from .sensor import Sensor
 from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
+from .plot_cluster import PlotCluster
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "Sensor",
     "IrrigationRecord",
     "Harvest",
+    "PlotCluster",
 ]

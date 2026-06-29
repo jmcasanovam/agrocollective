@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Procesamiento inteligente
     AGGREGATION_WINDOW_DAYS: int = 30
     CLUSTERING_SCHEDULE_HOUR: int = 2
+    KMEANS_MAX_CLUSTERS: int = 5
 
     # Logging
     LOG_LEVEL: str = "INFO"
