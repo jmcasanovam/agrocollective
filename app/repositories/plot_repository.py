@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.plot import Plot
 from app.models.farm import Farm
+from app.models.user import User
 from app.schemas.plot import PlotCreate, PlotUpdate
 
 
@@ -38,8 +39,9 @@ class PlotRepository:
     def get_by_id_and_user(self, db: Session, plot_id: UUID, user_id: UUID) -> Plot | None:
         return (
             db.query(Plot)
-            .join(Farm)
-            .filter(Plot.id == plot_id, Farm.user_id == user_id)
+            .join(Farm, Farm.id == Plot.farm_id)
+            .join(User, User.id == Farm.user_id)
+            .filter(Plot.id == plot_id, Farm.user_id == user_id, User.is_active == True)
             .first()
         )
 

@@ -1,15 +1,28 @@
 /*
- * AgroCollective - Fleet Node v0.1
+ * AgroCollective - Fleet Node v0.2
  * ESP32 DevKit C V4 — flota de 10 parcelas
  *
  * Sensores físicos:
- *   GPIO 15 → DHT22 (temp aire + humedad relativa)
- *   GPIO  5 → DS18B20 (temp suelo, OneWire)
+ *   GPIO 15 → DHT22  (temperatura aire + humedad relativa)
+ *   GPIO  5 → DS18B20 (temperatura suelo, OneWire)
  *   GPIO 34 → Sensor capacitivo humedad suelo (ADC1_CH6)
  *
- * Cada ciclo (PUBLISH_INTERVAL ms) lee los sensores una vez y publica
- * 10 mensajes MQTT con variaciones por parcela para simular condiciones distintas.
- * El timestamp es simulado: cada ciclo avanza 3 horas (SIM_STEP segundos).
+ * Arquitectura de buffer:
+ *   Cada SAMPLE_INTERVAL ms se toman lecturas de los 3 sensores y se
+ *   almacenan en sus respectivos buffers.  Cuando los buffers se llenan
+ *   (BUFFER_SIZE muestras ≈ 15 min) se aplica preprocesamiento:
+ *     1. Se descartan valores nulos o fuera del rango normal de cada sensor.
+ *     2. Se calcula la media de los valores válidos restantes.
+ *   Con las medias se publica un ciclo completo para las 10 parcelas de la
+ *   flota y se reinician los buffers.
+ *
+ * Tópico de publicación:
+ *   fincas/{finca_id}/parcelas/{parcela_id}/lecturas
+ *
+ * Variables de conexión (declaradas al inicio; no tienen por qué existir
+ * en el entorno real — el sketch puede sustituirse por credenciales reales):
+ *   WIFI_SSID / WIFI_PASS
+ *   MQTT_BROKER / MQTT_PORT / MQTT_CLIENT_ID
  */
 
 #include <WiFi.h>
@@ -19,16 +32,16 @@
 #include <DallasTemperature.h>
 #include <ArduinoJson.h>
 
-// ── Configuración ──────────────────────────────────────────────────────────────
+// ── Variables de conexión ──────────────────────────────────────────────────────
+// Sustituir por credenciales reales; no tienen por qué existir en este entorno.
 
-const char* WIFI_SSID        = "Wokwi-GUEST";
-const char* WIFI_PASS        = "";
-const char* MQTT_BROKER      = "broker.hivemq.com";
-const int   MQTT_PORT        = 1883;
-const char* MQTT_CLIENT_ID   = "agrocollective-fleet-001";
-
-const unsigned long PUBLISH_INTERVAL = 10000UL;   // ms entre ciclos
-const unsigned long SIM_STEP         = 10800UL;   // segundos simulados por ciclo (3h)
+const char* WIFI_SSID      = "Wokwi-GUEST";
+const char* WIFI_PASS      = "";
+const char* MQTT_BROKER    = "broker.hivemq.com";
+const int   MQTT_PORT      = 1883;
+const char* MQTT_CLIENT_ID = "agrocollective-fleet-001";
+const char* MQTT_USER      = "";   // dejar vacío si no hay autenticación
+const char* MQTT_PASS_STR  = "";   // dejar vacío si no hay autenticación
 
 // ── Pines ──────────────────────────────────────────────────────────────────────
 
@@ -41,7 +54,36 @@ const unsigned long SIM_STEP         = 10800UL;   // segundos simulados por cicl
 #define SOIL_DRY_ADC  2800
 #define SOIL_WET_ADC  1200
 
-// ── Objetos hardware ────────────────────────────────────────────────────────────
+// ── Configuración de buffer ────────────────────────────────────────────────────
+
+#define BUFFER_SIZE     15          // muestras por ventana (≈ 15 min)
+#define SAMPLE_INTERVAL 60000UL    // ms entre muestras (1 minuto)
+
+// Rangos válidos para filtrado de outliers/nulos
+#define AIR_TEMP_MIN   -10.0f
+#define AIR_TEMP_MAX    60.0f
+#define SOIL_TEMP_MIN   -5.0f
+#define SOIL_TEMP_MAX   50.0f
+#define REL_HUM_MIN      0.0f
+#define REL_HUM_MAX    100.0f
+#define SOIL_HUM_MIN     0.0f
+#define SOIL_HUM_MAX   100.0f
+
+// ── Buffers (3 grupos por sensor físico) ──────────────────────────────────────
+// Buffer 1: sensor de temperatura ambiente (DHT22 — temperatura)
+float bufAirTemp[BUFFER_SIZE];
+int   bufAirTempCount = 0;
+
+// Buffer 2: sensor de temperatura del suelo (DS18B20)
+float bufSoilTemp[BUFFER_SIZE];
+int   bufSoilTempCount = 0;
+
+// Buffer 3: sensores de humedad — ambiente (DHT22) y suelo (SEN0193)
+float bufRelHum [BUFFER_SIZE];
+float bufSoilHum[BUFFER_SIZE];
+int   bufHumCount = 0;
+
+// ── Objetos hardware ──────────────────────────────────────────────────────────
 
 DHT               dht(DHT_PIN, DHT_TYPE);
 OneWire           oneWire(DS_PIN);
@@ -49,7 +91,7 @@ DallasTemperature ds18b20(&oneWire);
 WiFiClient        wifiClient;
 PubSubClient      mqtt(wifiClient);
 
-// ── Flota de 10 parcelas ────────────────────────────────────────────────────────
+// ── Flota de 10 parcelas ──────────────────────────────────────────────────────
 
 #define FLEET_SIZE 10
 
@@ -64,7 +106,6 @@ struct Parcela {
 };
 
 // 4 olivos, 3 almendros, 3 viñas — 5 VALENCIA, 5 BAZA
-// esp32_id provisionales; sustituir por los reales tras el seed de la API
 Parcela fleet[FLEET_SIZE] = {
   {"F001", "P001", "ESP-P001", "olivo",    "VALENCIA", 30, 4200.0f},
   {"F001", "P002", "ESP-P002", "almendro", "VALENCIA", 30, 4185.0f},
@@ -78,12 +119,14 @@ Parcela fleet[FLEET_SIZE] = {
   {"F005", "P002", "ESP-P010", "olivo",    "BAZA",     30, 4065.0f},
 };
 
-// ── Tiempo simulado ─────────────────────────────────────────────────────────────
+// ── Tiempo simulado ───────────────────────────────────────────────────────────
 // 2025-05-01 00:00:00 UTC = 1746057600
-unsigned long simEpoch  = 1746057600UL;
-unsigned long lastPublish = 0;
+unsigned long simEpoch    = 1746057600UL;
+const unsigned long SIM_STEP = 10800UL;   // segundos simulados por publicación (3h)
 
-// ── Funciones auxiliares ────────────────────────────────────────────────────────
+unsigned long lastSample = 0;
+
+// ── Funciones de red ──────────────────────────────────────────────────────────
 
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
@@ -105,14 +148,18 @@ void connectWiFi() {
 void connectMQTT() {
   if (mqtt.connected()) return;
   Serial.printf("[MQTT] Conectando a %s:%d...\n", MQTT_BROKER, MQTT_PORT);
-  if (mqtt.connect(MQTT_CLIENT_ID)) {
+  bool ok = (strlen(MQTT_USER) > 0)
+      ? mqtt.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS_STR)
+      : mqtt.connect(MQTT_CLIENT_ID);
+  if (ok) {
     Serial.println("[MQTT] Conectado");
   } else {
     Serial.printf("[MQTT] ERROR rc=%d\n", mqtt.state());
   }
 }
 
-// Convierte unix epoch a cadena ISO 8601 UTC ("2025-06-01T00:00:00Z")
+// ── Utilidades ────────────────────────────────────────────────────────────────
+
 String epochToISO8601(unsigned long epoch) {
   unsigned long e = epoch;
   int sec  = e % 60; e /= 60;
@@ -122,7 +169,7 @@ String epochToISO8601(unsigned long epoch) {
   unsigned long days = e;
   int year = 1970;
   while (true) {
-    bool leap    = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+    bool leap  = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
     unsigned diy = leap ? 366u : 365u;
     if (days < diy) break;
     days -= diy;
@@ -139,26 +186,62 @@ String epochToISO8601(unsigned long epoch) {
   return String(buf);
 }
 
-// Publica las 10 parcelas de la flota en un único ciclo
-void publishFleet() {
-  // Una sola lectura física — luego se aplica variación por parcela
+// ── Preprocesamiento: media filtrada de un buffer ─────────────────────────────
+// Descarta valores NaN y fuera del rango [minVal, maxVal].
+// Devuelve NAN si no hay ningún valor válido.
+
+float filteredMean(float* buf, int count, float minVal, float maxVal) {
+  float sum   = 0.0f;
+  int   valid = 0;
+  for (int i = 0; i < count; i++) {
+    if (isnan(buf[i])) continue;
+    if (buf[i] < minVal || buf[i] > maxVal) continue;
+    sum += buf[i];
+    valid++;
+  }
+  return (valid > 0) ? (sum / (float)valid) : NAN;
+}
+
+// ── Muestreo: lectura y almacenamiento en buffers ─────────────────────────────
+
+void sampleSensors() {
   ds18b20.requestTemperatures();
 
-  float baseAirTemp  = dht.readTemperature();
-  float baseRelHum   = dht.readHumidity();
-  float baseSoilTemp = ds18b20.getTempCByIndex(0);
-  int   rawSoil      = analogRead(SOIL_PIN);
+  float airTemp  = dht.readTemperature();
+  float relHum   = dht.readHumidity();
+  float soilTemp = ds18b20.getTempCByIndex(0);
+  int   rawSoil  = analogRead(SOIL_PIN);
 
-  // Valores de fallback si el sensor no responde en Wokwi
-  if (isnan(baseAirTemp))                        baseAirTemp  = 22.5f;
-  if (isnan(baseRelHum))                         baseRelHum   = 62.0f;
-  if (baseSoilTemp == DEVICE_DISCONNECTED_C)     baseSoilTemp = 19.5f;
+  // Temperatura aire (buffer 1)
+  if (!isnan(airTemp) && bufAirTempCount < BUFFER_SIZE) {
+    bufAirTemp[bufAirTempCount++] = airTemp;
+  }
 
-  // ADC 12-bit → humedad suelo %: seco 0% (~2800), mojado 100% (~1200)
-  float baseHum = (float)(SOIL_DRY_ADC - rawSoil) /
-                  (float)(SOIL_DRY_ADC - SOIL_WET_ADC) * 100.0f;
-  baseHum = constrain(baseHum, 0.0f, 100.0f);
+  // Temperatura suelo (buffer 2)
+  if (soilTemp != DEVICE_DISCONNECTED_C && bufSoilTempCount < BUFFER_SIZE) {
+    bufSoilTemp[bufSoilTempCount++] = soilTemp;
+  }
 
+  // Humedad ambiente + suelo (buffer 3, contador compartido)
+  if (!isnan(relHum) && bufHumCount < BUFFER_SIZE) {
+    float soilHum = (float)(SOIL_DRY_ADC - rawSoil) /
+                    (float)(SOIL_DRY_ADC - SOIL_WET_ADC) * 100.0f;
+    soilHum = constrain(soilHum, 0.0f, 100.0f);
+
+    bufRelHum [bufHumCount] = relHum;
+    bufSoilHum[bufHumCount] = soilHum;
+    bufHumCount++;
+  }
+
+  Serial.printf("[Buffer] airTemp=%d/%d  soilTemp=%d/%d  hum=%d/%d\n",
+                bufAirTempCount, BUFFER_SIZE,
+                bufSoilTempCount, BUFFER_SIZE,
+                bufHumCount, BUFFER_SIZE);
+}
+
+// ── Publicación: un ciclo completo con las medias preprocesadas ───────────────
+
+void publishFleet(float avgAirTemp, float avgSoilTemp, float avgRelHum, float avgSoilHum) {
   String ts = epochToISO8601(simEpoch);
 
   for (int i = 0; i < FLEET_SIZE; i++) {
@@ -167,21 +250,25 @@ void publishFleet() {
     // Variación determinista por índice (±1.8 °C entre extremos de flota)
     float delta = (i - 4.5f) * 0.4f;
 
-    float airTemp  = baseAirTemp  + delta;
-    float soilTemp = baseSoilTemp + delta * 0.6f;
-    float relHum   = baseRelHum   - delta * 0.8f;
-    float soilHum  = constrain(baseHum + i * 1.5f, 0.0f, 100.0f);
+    float airTemp  = avgAirTemp  + delta;
+    float soilTemp = avgSoilTemp + delta * 0.6f;
+    float relHum   = avgRelHum   - delta * 0.8f;
+    float soilHum  = constrain(avgSoilHum + i * 1.5f, 0.0f, 100.0f);
 
-    // Batería: descarga lenta y ligeramente aleatoria
+    // Aplicar fallbacks si la media no es válida
+    if (isnan(airTemp))  airTemp  = 22.5f + delta;
+    if (isnan(soilTemp)) soilTemp = 19.5f + delta * 0.6f;
+    if (isnan(relHum))   relHum   = 62.0f - delta * 0.8f;
+    if (isnan(soilHum))  soilHum  = constrain(45.0f + i * 1.5f, 0.0f, 100.0f);
+
+    // Batería: descarga lenta
     p.battery_mv -= (float)random(0, 4) / 10.0f;
     if (p.battery_mv < 3300.0f) p.battery_mv = 3300.0f;
 
-    // Tópico
     char topic[80];
     snprintf(topic, sizeof(topic),
              "fincas/%s/parcelas/%s/lecturas", p.finca_id, p.parcela_id);
 
-    // Payload
     StaticJsonDocument<256> doc;
     doc["finca_id"]          = p.finca_id;
     doc["parcela_id"]        = p.parcela_id;
@@ -200,22 +287,48 @@ void publishFleet() {
     bool ok = mqtt.publish(topic, payload);
     Serial.printf("[%s/%s] (%s) %s\n",
                   p.finca_id, p.parcela_id, ok ? "OK" : "FAIL", payload);
-    delay(50);  // pequeña pausa entre mensajes consecutivos
+    delay(50);
   }
 
   simEpoch += SIM_STEP;
-  Serial.printf("--- Ciclo completo. Próximo ts: %s ---\n\n",
+  Serial.printf("--- Ciclo publicado. Próximo ts: %s ---\n\n",
                 epochToISO8601(simEpoch).c_str());
 }
 
-// ── Setup / Loop ────────────────────────────────────────────────────────────────
+// ── Preprocesar buffers y publicar cuando estén llenos ───────────────────────
+
+void processAndPublishIfReady() {
+  // El ciclo se dispara cuando los 3 buffers han alcanzado BUFFER_SIZE
+  if (bufAirTempCount  < BUFFER_SIZE) return;
+  if (bufSoilTempCount < BUFFER_SIZE) return;
+  if (bufHumCount      < BUFFER_SIZE) return;
+
+  Serial.println("[Proceso] Buffers llenos — preprocesando...");
+
+  float avgAirTemp  = filteredMean(bufAirTemp,  bufAirTempCount,  AIR_TEMP_MIN,  AIR_TEMP_MAX);
+  float avgSoilTemp = filteredMean(bufSoilTemp, bufSoilTempCount, SOIL_TEMP_MIN, SOIL_TEMP_MAX);
+  float avgRelHum   = filteredMean(bufRelHum,   bufHumCount,      REL_HUM_MIN,   REL_HUM_MAX);
+  float avgSoilHum  = filteredMean(bufSoilHum,  bufHumCount,      SOIL_HUM_MIN,  SOIL_HUM_MAX);
+
+  Serial.printf("[Medias] airTemp=%.2f  soilTemp=%.2f  relHum=%.2f  soilHum=%.2f\n",
+                avgAirTemp, avgSoilTemp, avgRelHum, avgSoilHum);
+
+  publishFleet(avgAirTemp, avgSoilTemp, avgRelHum, avgSoilHum);
+
+  // Reiniciar buffers
+  bufAirTempCount  = 0;
+  bufSoilTempCount = 0;
+  bufHumCount      = 0;
+}
+
+// ── Setup / Loop ──────────────────────────────────────────────────────────────
 
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("=== AgroCollective Fleet Node v0.1 ===");
-  Serial.printf("Flota: %d parcelas | Intervalo: %lu ms | Paso simulado: %lu s (3h)\n\n",
-                FLEET_SIZE, PUBLISH_INTERVAL, SIM_STEP);
+  Serial.println("=== AgroCollective Fleet Node v0.2 ===");
+  Serial.printf("Flota: %d parcelas | Buffer: %d muestras | Intervalo: %lu s\n\n",
+                FLEET_SIZE, BUFFER_SIZE, SAMPLE_INTERVAL / 1000UL);
 
   dht.begin();
   ds18b20.begin();
@@ -223,6 +336,10 @@ void setup() {
   connectWiFi();
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
   connectMQTT();
+
+  // Primera muestra inmediata para no esperar el primer intervalo
+  lastSample = millis();
+  sampleSensors();
 }
 
 void loop() {
@@ -230,8 +347,9 @@ void loop() {
   connectMQTT();
   mqtt.loop();
 
-  if (millis() - lastPublish >= PUBLISH_INTERVAL) {
-    lastPublish = millis();
-    publishFleet();
+  if (millis() - lastSample >= SAMPLE_INTERVAL) {
+    lastSample = millis();
+    sampleSensors();
+    processAndPublishIfReady();
   }
 }
