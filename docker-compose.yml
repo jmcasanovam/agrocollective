@@ -74,6 +74,13 @@ services:
     ports:
       - "1883:1883"
 
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
 volumes:
   postgres_data:
   influxdb_data:
+  mosquitto_data:
+  mosquitto_log:
