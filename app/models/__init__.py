@@ -9,6 +9,7 @@ from .sensor import Sensor
 from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
 from .plot_cluster import PlotCluster
+from .plot_anomaly import PlotAnomaly
 
 __all__ = [
     "User",
@@ -22,4 +23,5 @@ __all__ = [
     "IrrigationRecord",
     "Harvest",
     "PlotCluster",
+    "PlotAnomaly",
 ]
