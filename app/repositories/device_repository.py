@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.device import Device
 from app.models.plot import Plot
 from app.models.farm import Farm
+from app.models.user import User
 from app.schemas.device import DeviceCreate, DeviceUpdate
 
 
@@ -23,9 +24,10 @@ class DeviceRepository:
     def get_by_id_and_user(self, db: Session, device_id: UUID, user_id: UUID) -> Device | None:
         return (
             db.query(Device)
-            .join(Plot)
-            .join(Farm)
-            .filter(Device.id == device_id, Farm.user_id == user_id)
+            .join(Plot, Plot.id == Device.plot_id)
+            .join(Farm, Farm.id == Plot.farm_id)
+            .join(User, User.id == Farm.user_id)
+            .filter(Device.id == device_id, Farm.user_id == user_id, User.is_active == True)
             .first()
         )
 
@@ -35,9 +37,10 @@ class DeviceRepository:
     def get_by_plot(self, db: Session, plot_id: UUID, user_id: UUID) -> Device | None:
         return (
             db.query(Device)
-            .join(Plot)
-            .join(Farm)
-            .filter(Device.plot_id == plot_id, Farm.user_id == user_id)
+            .join(Plot, Plot.id == Device.plot_id)
+            .join(Farm, Farm.id == Plot.farm_id)
+            .join(User, User.id == Farm.user_id)
+            .filter(Device.plot_id == plot_id, Farm.user_id == user_id, User.is_active == True)
             .first()
         )
 
