@@ -16,3 +16,8 @@ class Device(Base, BaseModelMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     plot = relationship("Plot", back_populates="devices")
+    sensors = relationship(
+        "Sensor",
+        secondary="device_sensors",
+        back_populates="devices",
+    )
