@@ -1,17 +1,15 @@
 """
 Worker de procesamiento inteligente nocturno (Fases 3-10).
 
-Ejecuta el pipeline completo sobre todas las parcelas activas:
-  Fase 3  — Obtención de históricos y generación de variables agregadas
-  Fase 4  — Clustering K-Means                   (pendiente)
-  Fase 5  — Detección de anomalías (LOF)          (pendiente)
-  Fase 6  — Análisis causal                       (pendiente)
-  Fase 7  — Búsqueda de parcelas análogas         (pendiente)
-  Fase 8  — Predicción ML                         (pendiente)
-  Fase 9  — Generación de recomendaciones         (pendiente)
-  Fase 10 — Actualización del historial           (pendiente)
-
-Puede lanzarse manualmente o programarse via APScheduler / cron.
+Fases implementadas:
+  Fase 3  — Obtención de históricos y generación de variables agregadas  ✓
+  Fase 4  — Clustering K-Means                                           ✓
+  Fase 5  — Detección de anomalías (LOF)                                (pendiente)
+  Fase 6  — Análisis causal                                             (pendiente)
+  Fase 7  — Búsqueda de parcelas análogas                               (pendiente)
+  Fase 8  — Predicción ML                                               (pendiente)
+  Fase 9  — Generación de recomendaciones                               (pendiente)
+  Fase 10 — Actualización del historial                                 (pendiente)
 """
 
 import logging
@@ -22,11 +20,13 @@ from sqlalchemy.orm import Session
 from app.database.postgres import SessionLocal
 from app.models.plot import Plot
 from app.services.measurements.aggregation_service import PlotAggregates, aggregation_service
+from app.services.clustering.kmeans_service import ClusteringResult, kmeans_service
+from app.services.clustering.cluster_statistics import save_clustering_result
 
 logger = logging.getLogger(__name__)
 
 
-def run_pipeline(window_days: int | None = None) -> list[PlotAggregates]:
+def run_pipeline(window_days: int | None = None) -> ClusteringResult:
     """
     Ejecuta el pipeline de procesamiento inteligente sobre todas las parcelas activas.
 
@@ -35,27 +35,27 @@ def run_pipeline(window_days: int | None = None) -> list[PlotAggregates]:
                      None → usa AGGREGATION_WINDOW_DAYS del .env.
 
     Returns:
-        Lista de PlotAggregates con las variables calculadas de cada parcela.
+        ClusteringResult con las asignaciones de cluster.
     """
     started_at = datetime.now(timezone.utc)
     logger.info("=== Inicio pipeline clustering | %s ===", started_at.isoformat())
 
     db: Session = SessionLocal()
-    results: list[PlotAggregates] = []
+    aggregates: list[PlotAggregates] = []
 
     try:
+        # ── Fase 3: variables agregadas ─────────────────────────────────────
         plots: list[Plot] = db.query(Plot).filter(Plot.hash_plot.isnot(None)).all()
         total = len(plots)
-        logger.info("Parcelas a procesar: %d", total)
+        logger.info("[Fase 3] Parcelas a procesar: %d", total)
 
         for i, plot in enumerate(plots, start=1):
             try:
                 agg = aggregation_service.compute(db, plot, window_days)
-                results.append(agg)
+                aggregates.append(agg)
                 logger.info(
-                    "[%d/%d] Parcela %s... | hum=%.1f air=%.1f riego=%d total_mm=%s yield=%s eff=%s",
-                    i, total,
-                    str(plot.id)[:8],
+                    "[Fase 3][%d/%d] Parcela %s... | hum=%.1f air=%.1f riego=%d total_mm=%s yield=%s eff=%s",
+                    i, total, str(plot.id)[:8],
                     agg.avg_soil_humidity or 0,
                     agg.avg_air_temp or 0,
                     agg.irrigation_frequency,
@@ -64,20 +64,27 @@ def run_pipeline(window_days: int | None = None) -> list[PlotAggregates]:
                     f"{agg.water_efficiency:.4f}" if agg.water_efficiency else "—",
                 )
             except Exception as exc:
-                logger.exception("Error procesando parcela %s: %s", plot.id, exc)
+                logger.exception("[Fase 3] Error procesando parcela %s: %s", plot.id, exc)
+
+        # ── Fase 4: clustering K-Means ──────────────────────────────────────
+        logger.info("[Fase 4] Iniciando K-Means sobre %d parcelas...", len(aggregates))
+        clustering_result = kmeans_service.run(aggregates)
+        save_clustering_result(db, clustering_result)
 
         elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
-        logger.info("=== Fase 3 completada | %d/%d parcelas | %.1fs ===", len(results), total, elapsed)
+        logger.info(
+            "=== Pipeline completado | Fases 3-4 | %d parcelas | k=%d | %.1fs ===",
+            len(aggregates), clustering_result.n_clusters, elapsed,
+        )
 
-        # Fases 4-10: se añadirán aquí de forma encadenada
-        # results = kmeans_service.run(results)
-        # anomalies = lof_service.run(results)
+        # Fases 5-10: se encadenarán aquí
+        # anomalies = lof_service.run(aggregates, clustering_result)   # Fase 5
         # ...
 
     finally:
         db.close()
 
-    return results
+    return clustering_result
 
 
 if __name__ == "__main__":
