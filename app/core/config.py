@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     AGGREGATION_WINDOW_DAYS: int = 30
     CLUSTERING_SCHEDULE_HOUR: int = 2
     KMEANS_MAX_CLUSTERS: int = 5
+    LOF_N_NEIGHBORS: int = 5
+    LOF_THRESHOLD: float = 1.5
 
     # Logging
     LOG_LEVEL: str = "INFO"

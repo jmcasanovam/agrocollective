@@ -4,7 +4,7 @@ Worker de procesamiento inteligente nocturno (Fases 3-10).
 Fases implementadas:
   Fase 3  — Obtención de históricos y generación de variables agregadas  ✓
   Fase 4  — Clustering K-Means                                           ✓
-  Fase 5  — Detección de anomalías (LOF)                                (pendiente)
+  Fase 5  — Detección de anomalías (LOF)                                ✓
   Fase 6  — Análisis causal                                             (pendiente)
   Fase 7  — Búsqueda de parcelas análogas                               (pendiente)
   Fase 8  — Predicción ML                                               (pendiente)
@@ -22,6 +22,8 @@ from app.models.plot import Plot
 from app.services.measurements.aggregation_service import PlotAggregates, aggregation_service
 from app.services.clustering.kmeans_service import ClusteringResult, kmeans_service
 from app.services.clustering.cluster_statistics import save_clustering_result
+from app.services.anomalies.lof_service import AnomalyResult, lof_service
+from app.repositories.anomaly_repository import anomaly_repository
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +73,21 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
         clustering_result = kmeans_service.run(aggregates)
         save_clustering_result(db, clustering_result)
 
+        # ── Fase 5: detección de anomalías (LOF) ───────────────────────────
+        logger.info("[Fase 5] Iniciando LOF sobre %d parcelas...", len(aggregates))
+        anomaly_results: list[AnomalyResult] = lof_service.run(aggregates, clustering_result)
+        anomaly_repository.save_results(db, anomaly_results)
+        n_anomalies = sum(1 for r in anomaly_results if r.is_anomaly)
+        logger.info("[Fase 5] %d anomalías detectadas de %d parcelas.", n_anomalies, len(anomaly_results))
+
         elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
         logger.info(
-            "=== Pipeline completado | Fases 3-4 | %d parcelas | k=%d | %.1fs ===",
-            len(aggregates), clustering_result.n_clusters, elapsed,
+            "=== Pipeline completado | Fases 3-5 | %d parcelas | k=%d | %d anomalías | %.1fs ===",
+            len(aggregates), clustering_result.n_clusters, n_anomalies, elapsed,
         )
 
-        # Fases 5-10: se encadenarán aquí
-        # anomalies = lof_service.run(aggregates, clustering_result)   # Fase 5
+        # Fases 6-10: se encadenarán aquí
+        # causal = causal_service.run(anomaly_results, aggregates)     # Fase 6
         # ...
 
     finally:
