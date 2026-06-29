@@ -25,15 +25,15 @@ mqtt_consumer (hilo FastAPI)
         ├─ Obtener hash_plot (SHA256 del plot.id, ya generado)
         ├─ Obtener region_code
         │
-        ├─ Escribir punto en InfluxDB
-        │    measurement: "measurements"
-        │    tags:   hash_plot, region_code
-        │    fields: soil_humidity, air_temp, soil_temp, relative_humidity, battery
-        │    time:   timestamp del payload (UTC)
+        ├─ Actualizar device en PostgreSQL  ← siempre, incluso si InfluxDB falla
+        │    last_seen_at = timestamp
+        │    battery_mv   = battery_mv
         │
-        └─ Actualizar device en PostgreSQL
-             last_seen_at = timestamp
-             battery_mv   = battery_mv
+        └─ Escribir punto en InfluxDB (con manejo de error independiente)
+             measurement: "measurements"
+             tags:   hash_plot, region_code
+             fields: soil_humidity, air_temp, soil_temp, relative_humidity, battery
+             time:   timestamp del payload (UTC)
 ```
 
 ---
@@ -83,7 +83,41 @@ Migración: `e2f3a4b5c6d7_add_device_telemetry_fields`
 
 ---
 
-## Prueba manual
+## Script de prueba interactivo
+
+El script `scripts/test_mqtt_flow.py` automatiza todo el flujo end-to-end desde dentro del contenedor:
+
+```bash
+docker exec -it agro_backend bash
+python scripts/seed_data.py        # solo la primera vez (carga catálogo)
+python scripts/test_mqtt_flow.py
+```
+
+### Opciones del menú
+
+| Opción | Acción |
+|---|---|
+| **1** | Registra el usuario, crea finca/parcela/dispositivo si no existen, y publica una lectura MQTT |
+| **2** | Login + crea lo que falte automáticamente + publica lectura |
+| **3** | Login + muestra `last_seen_at`, `battery_mv` y la query Flux del dispositivo |
+| **4** | Salir |
+
+> Las opciones 1 y 2 son idempotentes: si el dispositivo ya existe, no duplican los recursos.
+
+### Variables configurables al inicio del script
+
+```python
+USER_EMAIL      = "agricultor@prueba.com"
+DEVICE_CODE     = "D001"
+MQTT_BATTERY_MV = 4150
+MQTT_MEASURES   = { "soil_humidity": 45.0, ... }
+```
+
+El host MQTT se lee automáticamente de la variable de entorno `MQTT_HOST` (dentro del contenedor = `mosquitto`).
+
+---
+
+## Prueba manual (sin script)
 
 1. Registrar un usuario, crear finca, parcela y dispositivo con `code = "D001"` vía API.
 2. Publicar mensaje MQTT:

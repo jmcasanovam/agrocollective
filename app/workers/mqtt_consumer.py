@@ -117,13 +117,16 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage) -> None:
             device_code, device.plot_id, payload.battery_mv
         )
 
-        store_reading(
-            db=db,
-            device=device,
-            timestamp=payload.timestamp,
-            battery_mv=payload.battery_mv,
-            measures=payload.measures.model_dump(exclude_none=True),
-        )
+        try:
+            store_reading(
+                db=db,
+                device=device,
+                timestamp=payload.timestamp,
+                battery_mv=payload.battery_mv,
+                measures=payload.measures.model_dump(exclude_none=True),
+            )
+        except Exception as exc:
+            logger.exception("Error al procesar lectura del dispositivo '%s': %s", device_code, exc)
 
     finally:
         db.close()

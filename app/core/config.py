@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # SiAR (solo requerido por scripts/download_siar.py)
     SIAR_TOKEN: str = ""
 
+    # Procesamiento inteligente
+    AGGREGATION_WINDOW_DAYS: int = 30
+    CLUSTERING_SCHEDULE_HOUR: int = 2
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
