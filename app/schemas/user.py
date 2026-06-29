@@ -7,7 +7,6 @@ from pydantic import ConfigDict
 
 class UserBase(BaseModel):
     email: EmailStr
-    region: str | None = None
 
 
 class UserCreate(UserBase):

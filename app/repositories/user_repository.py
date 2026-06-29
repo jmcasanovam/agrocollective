@@ -42,7 +42,6 @@ class UserRepository:
         db_user = User(
             email=user.email,
             password_hash=password_hash,
-            region=user.region
         )
 
         db.add(db_user)
