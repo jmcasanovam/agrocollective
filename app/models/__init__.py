@@ -10,6 +10,7 @@ from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
 from .plot_cluster import PlotCluster
 from .plot_anomaly import PlotAnomaly
+from .plot_causal_result import PlotCausalResult
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "Harvest",
     "PlotCluster",
     "PlotAnomaly",
+    "PlotCausalResult",
 ]

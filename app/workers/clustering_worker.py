@@ -5,7 +5,7 @@ Fases implementadas:
   Fase 3  — Obtención de históricos y generación de variables agregadas  ✓
   Fase 4  — Clustering K-Means                                           ✓
   Fase 5  — Detección de anomalías (LOF)                                ✓
-  Fase 6  — Análisis causal                                             (pendiente)
+  Fase 6  — Análisis causal                                             ✓
   Fase 7  — Búsqueda de parcelas análogas                               (pendiente)
   Fase 8  — Predicción ML                                               (pendiente)
   Fase 9  — Generación de recomendaciones                               (pendiente)
@@ -24,6 +24,8 @@ from app.services.clustering.kmeans_service import ClusteringResult, kmeans_serv
 from app.services.clustering.cluster_statistics import save_clustering_result
 from app.services.anomalies.lof_service import AnomalyResult, lof_service
 from app.repositories.anomaly_repository import anomaly_repository
+from app.services.recommendations.causal_analysis import CausalResult, causal_analysis_service
+from app.repositories.causal_repository import causal_repository
 
 logger = logging.getLogger(__name__)
 
@@ -80,15 +82,25 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
         n_anomalies = sum(1 for r in anomaly_results if r.is_anomaly)
         logger.info("[Fase 5] %d anomalías detectadas de %d parcelas.", n_anomalies, len(anomaly_results))
 
-        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        # ── Fase 6: análisis causal ─────────────────────────────────────────
+        logger.info("[Fase 6] Iniciando análisis causal...")
+        causal_results: list[CausalResult] = causal_analysis_service.run(
+            anomaly_results, db, window_days
+        )
+        causal_repository.save_results(db, causal_results)
+        n_causal = sum(1 for r in causal_results if r.causal_feature)
         logger.info(
-            "=== Pipeline completado | Fases 3-5 | %d parcelas | k=%d | %d anomalías | %.1fs ===",
-            len(aggregates), clustering_result.n_clusters, n_anomalies, elapsed,
+            "[Fase 6] %d causas identificadas de %d features anómalas.",
+            n_causal, len(causal_results),
         )
 
-        # Fases 6-10: se encadenarán aquí
-        # causal = causal_service.run(anomaly_results, aggregates)     # Fase 6
-        # ...
+        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        logger.info(
+            "=== Pipeline completado | Fases 3-6 | %d parcelas | k=%d | %d anomalías | %d causas | %.1fs ===",
+            len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, elapsed,
+        )
+
+        # Fases 7-10: se encadenarán aquí
 
     finally:
         db.close()
