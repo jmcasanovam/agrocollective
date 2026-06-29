@@ -5,6 +5,7 @@ from .crop import Crop
 from .soil import Soil
 from .region import Region
 from .device import Device
+from .sensor import Sensor
 from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
 
@@ -16,6 +17,7 @@ __all__ = [
     "Soil",
     "Region",
     "Device",
+    "Sensor",
     "IrrigationRecord",
     "Harvest",
 ]

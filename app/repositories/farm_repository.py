@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.farm import Farm
+from app.models.user import User
 from app.schemas.farm import FarmCreate, FarmUpdate
 
 
@@ -25,12 +26,18 @@ class FarmRepository:
     def get_by_id(self, db: Session, farm_id: UUID, user_id: UUID) -> Farm | None:
         return (
             db.query(Farm)
-            .filter(Farm.id == farm_id, Farm.user_id == user_id)
+            .join(User, User.id == Farm.user_id)
+            .filter(Farm.id == farm_id, Farm.user_id == user_id, User.is_active == True)
             .first()
         )
 
     def get_all_by_user(self, db: Session, user_id: UUID) -> list[Farm]:
-        return db.query(Farm).filter(Farm.user_id == user_id).all()
+        return (
+            db.query(Farm)
+            .join(User, User.id == Farm.user_id)
+            .filter(Farm.user_id == user_id, User.is_active == True)
+            .all()
+        )
 
     def update(self, db: Session, farm: Farm, farm_data: FarmUpdate) -> Farm:
         if farm_data.name is not None:
