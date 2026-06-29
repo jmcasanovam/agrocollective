@@ -1,31 +1,9 @@
-from uuid import UUID
+from app.schemas.crop import CropCreate, CropUpdate, CropResponse
+from app.schemas.soil import SoilCreate, SoilUpdate, SoilResponse
+from app.schemas.region import RegionCreate, RegionUpdate, RegionResponse
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
-
-
-class CropResponse(BaseModel):
-    id: UUID
-    name: str
-    description: str | None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class SoilResponse(BaseModel):
-    id: UUID
-    name: str
-    description: str | None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class RegionResponse(BaseModel):
-    id: UUID
-    code: str
-    name: str
-    latitude: float | None
-    longitude: float | None
-    siar_station_code: str | None
-
-    model_config = ConfigDict(from_attributes=True)
+__all__ = [
+    "CropCreate", "CropUpdate", "CropResponse",
+    "SoilCreate", "SoilUpdate", "SoilResponse",
+    "RegionCreate", "RegionUpdate", "RegionResponse",
+]
