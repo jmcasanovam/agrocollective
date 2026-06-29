@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
+    # SiAR (solo requerido por scripts/download_siar.py)
+    SIAR_TOKEN: str = ""
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
