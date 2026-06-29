@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     KMEANS_MAX_CLUSTERS: int = 5
     LOF_N_NEIGHBORS: int = 5
     LOF_THRESHOLD: float = 1.5
+    CAUSAL_MIN_PERIODS: int = 4
+    CAUSAL_MIN_CORR: float = 0.6
 
     # Logging
     LOG_LEVEL: str = "INFO"
