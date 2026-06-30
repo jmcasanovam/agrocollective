@@ -16,6 +16,7 @@ Prioridad:
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -204,6 +205,8 @@ class RecommendationService:
                 continue
 
             pct = round(gap * 100, 1)
+            r2 = pred.model_r2
+            r2_str = f"{r2:.2f}" if r2 is not None and not math.isnan(r2) else "N/A"
             title = f"Tu {label} está un {pct}% por debajo del potencial estimado"
             body = (
                 f"El modelo de predicción estima que parcelas con tus condiciones "
@@ -211,7 +214,7 @@ class RecommendationService:
                 f"({pct}% de diferencia). "
                 f"Compara tus prácticas con las parcelas análogas de tu grupo "
                 f"para identificar oportunidades de mejora. "
-                f"(R² del modelo: {pred.model_r2:.2f}, entrenado con {pred.n_training_samples} parcelas)"
+                f"(R² del modelo: {r2_str}, entrenado con {pred.n_training_samples} parcelas)"
             )
 
             recs.append(RecommendationResult(

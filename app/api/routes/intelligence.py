@@ -140,13 +140,13 @@ def get_analogues(
     else:
         # Último run_date disponible
         from app.models.plot_analogue import PlotAnalogue
-        latest = (
+        row = (
             db.query(PlotAnalogue.run_date)
             .filter(PlotAnalogue.plot_id == plot_id)
             .order_by(PlotAnalogue.run_date.desc())
-            .scalar()
+            .first()
         )
-        results = analogue_repository.get_analogues_for_plot(db, plot_id, latest) if latest else []
+        results = analogue_repository.get_analogues_for_plot(db, plot_id, row.run_date) if row else []
 
     return results
 
@@ -177,13 +177,13 @@ def get_ml_predictions(
         results = ml_prediction_repository.get_by_plot_and_date(db, plot_id, run_date)
     else:
         from app.models.plot_ml_prediction import PlotMlPrediction
-        latest = (
+        row = (
             db.query(PlotMlPrediction.run_date)
             .filter(PlotMlPrediction.plot_id == plot_id)
             .order_by(PlotMlPrediction.run_date.desc())
-            .scalar()
+            .first()
         )
-        results = ml_prediction_repository.get_by_plot_and_date(db, plot_id, latest) if latest else []
+        results = ml_prediction_repository.get_by_plot_and_date(db, plot_id, row.run_date) if row else []
 
     return results
 
