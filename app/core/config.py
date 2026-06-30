@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     LOF_THRESHOLD: float = 1.5
     CAUSAL_MIN_PERIODS: int = 4
     CAUSAL_MIN_CORR: float = 0.6
+    ANALOGUE_TOP_N: int = 5
 
     # Logging
     LOG_LEVEL: str = "INFO"
