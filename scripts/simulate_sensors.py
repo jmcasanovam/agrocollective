@@ -52,14 +52,26 @@ HOURS_PER_DAY = [0, 6, 12, 18]
 OUTLIER_RATE = 0.02
 OUTLIER_LOG  = Path("outliers_ground_truth.jsonl")
 
-# Estado inicial de humedad del suelo por perfil (%)
-SH_INIT = {"seco_eficiente": 38.0, "moderado": 50.0, "humedo_intensivo": 70.0}
-SH_MIN  = {"seco_eficiente": 20.0, "moderado": 30.0, "humedo_intensivo": 48.0}
-SH_MAX  = {"seco_eficiente": 58.0, "moderado": 68.0, "humedo_intensivo": 86.0}
+# Parámetros físicos por tipo de suelo (FIX2)
+# WP = punto de marchitez (%), FC = capacidad de campo (%)
+# dry = factor de velocidad de secado (escala el consumo por ETo;
+#       arenoso se seca más rápido, arcilloso retiene más)
+SOIL_PARAMS: dict[str, dict] = {
+    "arenoso":          {"WP":  8, "FC": 40, "dry": 1.4},
+    "franco-arenoso":   {"WP": 10, "FC": 48, "dry": 1.2},
+    "franco":           {"WP": 12, "FC": 55, "dry": 1.0},
+    "franco-arcilloso": {"WP": 15, "FC": 62, "dry": 0.8},
+    "arcilloso":        {"WP": 18, "FC": 68, "dry": 0.6},
+    "_default":         {"WP": 12, "FC": 55, "dry": 1.0},
+}
 
-# Irrigación diaria añadida (mm) por perfil; 1 mm ≈ 0.4 % de humedad de suelo
+# Fallback de suelo por índice cuando la BD no responde (cicla los 5 tipos)
+_SOIL_NAMES = ["arenoso", "franco-arenoso", "franco", "franco-arcilloso", "arcilloso"]
+SOIL_FALLBACK = [_SOIL_NAMES[i % len(_SOIL_NAMES)] for i in range(N_PLOTS)]
+
+# Irrigación diaria añadida (mm) por perfil de gestión
 IRRIG_MM   = {"seco_eficiente": 2.5, "moderado": 5.0, "humedo_intensivo": 9.0}
-MM_TO_PCT  = 0.4  # factor de conversión mm → %
+MM_TO_PCT  = 0.4  # mm → % (factor genérico; dry escala el lado de la ETo)
 
 # Fallback de perfil por índice cuando la BD no responde
 # (debe coincidir con MANAGEMENT_PROFILES de setup_simulation.py)
@@ -147,6 +159,25 @@ def load_management_profile_map() -> dict[str, str]:
     return mapping
 
 
+def load_soil_type_map() -> dict[str, str]:
+    """
+    Devuelve {device_code: soil_name} leyendo de BD (Device → Plot → Soil).
+    Fallback: cicla los 5 tipos de suelo por índice de parcela.
+    """
+    rows = _psql_rows(
+        "SELECT d.code, s.name "
+        "FROM devices d "
+        "JOIN plots p ON d.plot_id = p.id "
+        "JOIN soils s ON p.soil_id = s.id "
+        "WHERE d.is_active = true;"
+    )
+    mapping = {r[0]: r[1] for r in rows if len(r) == 2}
+    if not mapping:
+        print("[WARN] Sin soil_type en BD. Usando SOIL_FALLBACK.")
+        mapping = {f"AGRO-P{i:02d}-001": SOIL_FALLBACK[i] for i in range(N_PLOTS)}
+    return mapping
+
+
 # =============================================================================
 # Carga de datos SiAR desde InfluxDB
 # =============================================================================
@@ -229,12 +260,17 @@ def _diurnal_humidity(hour: int, h_min: float, h_max: float) -> float:
 class SensorSimulator:
     """Un dispositivo ESP32 simulado, anclado a los datos SiAR de su estación."""
 
-    def __init__(self, plot_index: int, station_code: str, profile: str):
+    def __init__(self, plot_index: int, station_code: str, profile: str, soil_type: str = "_default"):
         self.plot_index   = plot_index
         self.device_code  = f"{DEVICE_PREFIX}{plot_index:02d}-001"
         self.station_code = station_code
         self.profile      = profile
-        self._sh          = SH_INIT.get(profile, 50.0)  # estado agua del suelo (%)
+        self.soil_type    = soil_type
+        soil = SOIL_PARAMS.get(soil_type, SOIL_PARAMS["_default"])
+        self._wp   = soil["WP"]   # punto de marchitez (%)
+        self._fc   = soil["FC"]   # capacidad de campo (%)
+        self._dry  = soil["dry"]  # factor de secado por ETo
+        self._sh   = self._wp + (self._fc - self._wp) * 0.75  # nivel inicial: 75% del agua disponible
         self._last_day: date | None = None
 
     def _step_water_balance(self, day: date, w: dict) -> None:
@@ -245,10 +281,10 @@ class SensorSimulator:
         eto    = w.get("eto", 3.0)
         precip = w.get("precipitation", 0.0)
         irrig  = IRRIG_MM.get(self.profile, 5.0)
-        # mm → %: precipitación infiltra al 80 %, riego al 90 %, ETo drena al 100 %
-        delta  = (precip * 0.8 + irrig * 0.9 - eto) * MM_TO_PCT
-        self._sh = max(SH_MIN[self.profile],
-                       min(SH_MAX[self.profile], self._sh + delta))
+        # STOCK: delta modifica el nivel previo; ETo escala por tipo de suelo
+        delta  = (precip * 0.8 + irrig * 0.9 - eto * self._dry) * MM_TO_PCT
+        # Acotar entre WP y FC del suelo de la parcela (límites físicos)
+        self._sh = max(self._wp, min(self._fc, self._sh + delta))
 
     def next_reading(self, ts: datetime, day_weather: dict) -> dict:
         day = ts.date()
@@ -282,9 +318,10 @@ class SensorSimulator:
             2,
         )
 
-        # Humedad del suelo — balance hídrico + ruido intra-día
+        # Humedad del suelo — oscilación intra-día sobre el nivel diario (STOCK)
+        # Acotada a [WP, FC] del suelo; los outliers se aplican DESPUÉS, fuera del rango
         soil_hum = round(
-            max(5.0, min(100.0, self._sh + random.gauss(0, 0.5))), 2
+            max(self._wp, min(self._fc, self._sh + random.gauss(0, 0.4))), 2
         )
 
         battery = int(random.uniform(*BATTERY_RANGE))
@@ -383,9 +420,10 @@ def main() -> None:
 
     print("\n=== AgroCollective — Simulador SiAR-anclado (Sprint 2) ===")
 
-    # Resolver device→estación y perfil desde BD (con fallback)
+    # Resolver device→estación, perfil y tipo de suelo desde BD (con fallback)
     device_station = load_device_station_map()
     device_profile = load_management_profile_map()
+    device_soil    = load_soil_type_map()
 
     # Cargar datos climáticos de InfluxDB
     weather = load_weather_data()
@@ -396,8 +434,11 @@ def main() -> None:
         code    = f"{DEVICE_PREFIX}{i:02d}-001"
         station = device_station.get(code, "V17" if i < 5 else "GR01")
         profile = device_profile.get(code, PROFILE_FALLBACK[i])
-        simulators.append(SensorSimulator(i, station, profile))
-        print(f"  {code}  estacion={station}  perfil={profile}")
+        soil    = device_soil.get(code, SOIL_FALLBACK[i])
+        sp      = SOIL_PARAMS.get(soil, SOIL_PARAMS["_default"])
+        simulators.append(SensorSimulator(i, station, profile, soil))
+        print(f"  {code}  estacion={station}  perfil={profile}  "
+              f"suelo={soil}  WP={sp['WP']}%  FC={sp['FC']}%")
 
     days        = [START_DATE + timedelta(days=d)
                    for d in range((END_DATE - START_DATE).days + 1)]
