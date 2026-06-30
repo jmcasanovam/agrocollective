@@ -15,6 +15,7 @@ from app.api.routes.plots import router as plots_router
 from app.api.routes.devices import router as devices_router
 from app.api.routes.sensors import router as sensors_router
 from app.api.routes.catalog import router as catalog_router
+from app.api.routes.intelligence import router as intelligence_router
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ app.include_router(plots_router)
 app.include_router(devices_router)
 app.include_router(sensors_router)
 app.include_router(catalog_router)
+app.include_router(intelligence_router)
 
 
 @app.get("/health")
