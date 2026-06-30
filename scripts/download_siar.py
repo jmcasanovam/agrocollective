@@ -49,9 +49,9 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 BASE_URL    = "https://servicio.mapa.gob.es/siarapi"
 ENDPOINT    = f"{BASE_URL}/API/V1/Datos/Diarios/ESTACION"
-DATE_START  = date(2025, 6, 28)   # token SiAR autorizado desde ~12 meses atrás
-DATE_END    = date(2025, 10, 31)
-EXPECTED_DAYS = (DATE_END - DATE_START).days + 1  # 126
+DATE_START  = date(2025, 7, 1)   # Año móvil
+DATE_END    = date(2026, 6, 30)
+EXPECTED_DAYS = (DATE_END - DATE_START).days + 1
 
 STATION_REGION = {"V17": "VALENCIA", "GR01": "BAZA"}
 
@@ -63,7 +63,13 @@ FIELD_MAP = {
     "TempSuelo1":    "soil_temp",
     "EtPMon":        "eto",
     "PePMon":        "pe",
+    "TempMax":       "air_temp_max",
+    "TempMin":       "air_temp_min",
+    "HumedadMax":    "relative_humidity_max",
+    "humedadMin":    "relative_humidity_min",
 }
+
+DAILY_ONLY_FIELDS = {"air_temp_max", "air_temp_min", "relative_humidity_max", "relative_humidity_min"}
 
 SUM_FIELDS  = {"eto", "pe", "precipitation"}   # suma semanal
 MEAN_FIELDS = {"air_temp", "relative_humidity"} # media semanal
@@ -213,6 +219,8 @@ def validate_station(df: pd.DataFrame, station_id: str) -> pd.DataFrame:
     # Nulos por campo
     log.info("  Nulos por campo:")
     for siar_field, influx_field in FIELD_MAP.items():
+        if influx_field in DAILY_ONLY_FIELDS:
+            continue
         if siar_field not in df.columns:
             log.info("    %-15s → campo ausente en respuesta", siar_field)
             continue
@@ -327,6 +335,8 @@ def to_weekly_points(df: pd.DataFrame, station_id: str) -> list:
             .time(week_ts.to_pydatetime(), WritePrecision.S)
         )
         for siar_field, influx_field in FIELD_MAP.items():
+            if influx_field in DAILY_ONLY_FIELDS:
+                continue
             if siar_field not in group.columns:
                 continue
             series = group[siar_field].dropna()
