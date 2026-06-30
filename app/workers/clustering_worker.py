@@ -7,6 +7,7 @@ Fases implementadas:
   Fase 5  — Detección de anomalías (LOF)                                ✓
   Fase 6  — Análisis causal                                             ✓
   Fase 7  — Búsqueda de parcelas análogas                               ✓
+  Fase 8  — Predicción ML (Random Forest)                               ✓
   Fase 8  — Predicción ML                                               (pendiente)
   Fase 9  — Generación de recomendaciones                               (pendiente)
   Fase 10 — Actualización del historial                                 (pendiente)
@@ -28,6 +29,8 @@ from app.services.recommendations.causal_analysis import CausalResult, causal_an
 from app.repositories.causal_repository import causal_repository
 from app.services.clustering.analogue_service import AnalogueResult, analogue_service
 from app.repositories.analogue_repository import analogue_repository
+from app.services.ml.prediction_service import MlPredictionResult, prediction_service
+from app.repositories.ml_prediction_repository import ml_prediction_repository
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +107,18 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
 
         elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
         logger.info(
-            "=== Pipeline completado | Fases 3-7 | %d parcelas | k=%d | %d anomalías | %d causas | %.1fs ===",
-            len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, elapsed,
+            "=== Pipeline completado | Fases 3-8 | %d parcelas | k=%d | %d anomalías | %d causas | %d predicciones | %.1fs ===",
+            len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, n_predicted, elapsed,
         )
 
-        # Fases 8-10: se encadenarán aquí
+        # ── Fase 8: predicción ML ───────────────────────────────────────────
+        logger.info("[Fase 8] Iniciando predicción ML (Random Forest)...")
+        ml_results: list[MlPredictionResult] = prediction_service.run(aggregates, clustering_result)
+        ml_prediction_repository.save_results(db, ml_results)
+        n_predicted = sum(1 for r in ml_results if r.predicted_value is not None)
+        logger.info("[Fase 8] %d predicciones con valor de %d totales.", n_predicted, len(ml_results))
+
+        # Fases 9-10: se encadenarán aquí
 
     finally:
         db.close()

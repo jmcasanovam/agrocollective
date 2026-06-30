@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     CAUSAL_MIN_PERIODS: int = 4
     CAUSAL_MIN_CORR: float = 0.6
     ANALOGUE_TOP_N: int = 5
+    ML_MIN_SAMPLES: int = 10
+    ML_N_ESTIMATORS: int = 100
 
     # Logging
     LOG_LEVEL: str = "INFO"
