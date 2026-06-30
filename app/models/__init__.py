@@ -12,6 +12,7 @@ from .plot_cluster import PlotCluster
 from .plot_anomaly import PlotAnomaly
 from .plot_causal_result import PlotCausalResult
 from .plot_analogue import PlotAnalogue
+from .plot_ml_prediction import PlotMlPrediction
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "PlotAnomaly",
     "PlotCausalResult",
     "PlotAnalogue",
+    "PlotMlPrediction",
 ]
