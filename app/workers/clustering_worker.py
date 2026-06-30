@@ -6,7 +6,7 @@ Fases implementadas:
   Fase 4  — Clustering K-Means                                           ✓
   Fase 5  — Detección de anomalías (LOF)                                ✓
   Fase 6  — Análisis causal                                             ✓
-  Fase 7  — Búsqueda de parcelas análogas                               (pendiente)
+  Fase 7  — Búsqueda de parcelas análogas                               ✓
   Fase 8  — Predicción ML                                               (pendiente)
   Fase 9  — Generación de recomendaciones                               (pendiente)
   Fase 10 — Actualización del historial                                 (pendiente)
@@ -26,6 +26,8 @@ from app.services.anomalies.lof_service import AnomalyResult, lof_service
 from app.repositories.anomaly_repository import anomaly_repository
 from app.services.recommendations.causal_analysis import CausalResult, causal_analysis_service
 from app.repositories.causal_repository import causal_repository
+from app.services.clustering.analogue_service import AnalogueResult, analogue_service
+from app.repositories.analogue_repository import analogue_repository
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +96,19 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
             n_causal, len(causal_results),
         )
 
+        # ── Fase 7: parcelas análogas ───────────────────────────────────────
+        logger.info("[Fase 7] Buscando parcelas análogas...")
+        analogue_results: list[AnalogueResult] = analogue_service.run(aggregates, clustering_result)
+        analogue_repository.save_results(db, analogue_results)
+        logger.info("[Fase 7] %d registros de análogas guardados.", len(analogue_results))
+
         elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
         logger.info(
-            "=== Pipeline completado | Fases 3-6 | %d parcelas | k=%d | %d anomalías | %d causas | %.1fs ===",
+            "=== Pipeline completado | Fases 3-7 | %d parcelas | k=%d | %d anomalías | %d causas | %.1fs ===",
             len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, elapsed,
         )
 
-        # Fases 7-10: se encadenarán aquí
+        # Fases 8-10: se encadenarán aquí
 
     finally:
         db.close()

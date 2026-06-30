@@ -11,6 +11,7 @@ from .harvest import Harvest
 from .plot_cluster import PlotCluster
 from .plot_anomaly import PlotAnomaly
 from .plot_causal_result import PlotCausalResult
+from .plot_analogue import PlotAnalogue
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "PlotCluster",
     "PlotAnomaly",
     "PlotCausalResult",
+    "PlotAnalogue",
 ]
