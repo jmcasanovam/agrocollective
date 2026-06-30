@@ -9,6 +9,7 @@ Fases implementadas:
   Fase 7  — Búsqueda de parcelas análogas                               ✓
   Fase 8  — Predicción ML (Random Forest)                               ✓
   Fase 9  — Generación de recomendaciones                               ✓
+  Fase 10 — Actualización del historial de rendimiento                 ✓
   Fase 8  — Predicción ML                                               (pendiente)
   Fase 9  — Generación de recomendaciones                               (pendiente)
   Fase 10 — Actualización del historial                                 (pendiente)
@@ -34,6 +35,8 @@ from app.services.ml.prediction_service import MlPredictionResult, prediction_se
 from app.repositories.ml_prediction_repository import ml_prediction_repository
 from app.services.recommendations.recommendation_service import RecommendationResult, recommendation_service
 from app.repositories.recommendation_repository import recommendation_repository
+from app.services.history.performance_history_service import PerformanceSnapshot, performance_history_service
+from app.repositories.performance_history_repository import performance_history_repository
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +111,6 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
         analogue_repository.save_results(db, analogue_results)
         logger.info("[Fase 7] %d registros de análogas guardados.", len(analogue_results))
 
-        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
-        logger.info(
-            "=== Pipeline completado | Fases 3-9 | %d parcelas | k=%d | %d anomalías | %d causas | %d predicciones | %d recomendaciones | %.1fs ===",
-            len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, n_predicted, len(rec_results), elapsed,
-        )
-
         # ── Fase 8: predicción ML ───────────────────────────────────────────
         logger.info("[Fase 8] Iniciando predicción ML (Random Forest)...")
         ml_results: list[MlPredictionResult] = prediction_service.run(aggregates, clustering_result)
@@ -133,7 +130,19 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
             len(rec_results), n_high,
         )
 
-        # Fase 10: se encadenará aquí
+        # ── Fase 10: historial de rendimiento ──────────────────────────────
+        logger.info("[Fase 10] Actualizando historial de rendimiento...")
+        snapshots: list[PerformanceSnapshot] = performance_history_service.run(
+            aggregates, clustering_result, anomaly_results, ml_results, rec_results
+        )
+        performance_history_repository.save_snapshots(db, snapshots)
+        logger.info("[Fase 10] %d instantáneas guardadas.", len(snapshots))
+
+        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        logger.info(
+            "=== Pipeline completado | Fases 3-10 | %d parcelas | k=%d | %d anomalías | %d causas | %d predicciones | %d recomendaciones | %.1fs ===",
+            len(aggregates), clustering_result.n_clusters, n_anomalies, n_causal, n_predicted, len(rec_results), elapsed,
+        )
 
     finally:
         db.close()

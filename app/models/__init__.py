@@ -14,6 +14,7 @@ from .plot_causal_result import PlotCausalResult
 from .plot_analogue import PlotAnalogue
 from .plot_ml_prediction import PlotMlPrediction
 from .plot_recommendation import PlotRecommendation
+from .plot_performance_history import PlotPerformanceHistory
 
 __all__ = [
     "User",
@@ -32,4 +33,5 @@ __all__ = [
     "PlotAnalogue",
     "PlotMlPrediction",
     "PlotRecommendation",
+    "PlotPerformanceHistory",
 ]
