@@ -244,17 +244,17 @@ from(bucket: "{bucket}")
 
 
 def _diurnal_temp(hour: int, t_min: float, t_max: float) -> float:
-    """Sinusoidal: mínimo ~6h, máximo ~15h."""
+    """Coseno: máximo ~15h, mínimo ~3h. cos(0)=1 cuando hour==15."""
     amplitude = (t_max - t_min) / 2
     mid = (t_max + t_min) / 2
-    return mid + amplitude * math.sin(2 * math.pi * (hour - 15) / 24)
+    return mid + amplitude * math.cos(2 * math.pi * (hour - 15) / 24)
 
 
 def _diurnal_humidity(hour: int, h_min: float, h_max: float) -> float:
-    """Anti-fase con temperatura: máximo ~6h, mínimo ~15h."""
+    """Anti-fase con temperatura: mínimo ~15h, máximo ~3h."""
     amplitude = (h_max - h_min) / 2
     mid = (h_max + h_min) / 2
-    return mid - amplitude * math.sin(2 * math.pi * (hour - 15) / 24)
+    return mid - amplitude * math.cos(2 * math.pi * (hour - 15) / 24)
 
 
 class SensorSimulator:
@@ -309,11 +309,12 @@ class SensorSimulator:
             2,
         )
 
-        # Temperatura del suelo — media diaria SiAR + pequeña oscilación
+        # Temperatura del suelo — media diaria SiAR + oscilación retardada ~3h respecto al aire
+        # cos(hour-18): pico ~18h (3h después del pico del aire a las 15h)
         s_mean    = day_weather.get("soil_temp", t_mean - 2.0)
         soil_temp = round(
             s_mean
-            + 1.5 * math.sin(2 * math.pi * (hour - 14) / 24)
+            + 1.5 * math.cos(2 * math.pi * (hour - 18) / 24)
             + random.gauss(0, 0.2),
             2,
         )
