@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -15,6 +16,8 @@ class DeviceResponse(BaseModel):
     plot_id: UUID
     code: str | None
     is_active: bool
+    last_seen_at: datetime | None = None
+    battery_mv: int | None = None
     sensors: list[SensorResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

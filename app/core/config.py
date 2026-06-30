@@ -39,6 +39,18 @@ class Settings(BaseSettings):
     # SiAR (solo requerido por scripts/download_siar.py)
     SIAR_TOKEN: str = ""
 
+    # Procesamiento inteligente
+    AGGREGATION_WINDOW_DAYS: int = 30
+    CLUSTERING_SCHEDULE_HOUR: int = 2
+    KMEANS_MAX_CLUSTERS: int = 5
+    LOF_N_NEIGHBORS: int = 5
+    LOF_THRESHOLD: float = 1.5
+    CAUSAL_MIN_PERIODS: int = 4
+    CAUSAL_MIN_CORR: float = 0.6
+    ANALOGUE_TOP_N: int = 5
+    ML_MIN_SAMPLES: int = 10
+    ML_N_ESTIMATORS: int = 100
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
