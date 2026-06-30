@@ -8,6 +8,13 @@ from .device import Device
 from .sensor import Sensor
 from .irrigation_record import IrrigationRecord
 from .harvest import Harvest
+from .plot_cluster import PlotCluster
+from .plot_anomaly import PlotAnomaly
+from .plot_causal_result import PlotCausalResult
+from .plot_analogue import PlotAnalogue
+from .plot_ml_prediction import PlotMlPrediction
+from .plot_recommendation import PlotRecommendation
+from .plot_performance_history import PlotPerformanceHistory
 
 __all__ = [
     "User",
@@ -20,4 +27,11 @@ __all__ = [
     "Sensor",
     "IrrigationRecord",
     "Harvest",
+    "PlotCluster",
+    "PlotAnomaly",
+    "PlotCausalResult",
+    "PlotAnalogue",
+    "PlotMlPrediction",
+    "PlotRecommendation",
+    "PlotPerformanceHistory",
 ]
