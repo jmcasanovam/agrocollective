@@ -98,7 +98,7 @@ BATTERY_RANGE = (3400, 4100)
 def _psql(sql: str) -> str:
     result = subprocess.run(
         ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro_user", "-d", "agrocollective",
+         "psql", "-U", "agro", "-d", "agrocollective",
          "-t", "-A", "-F", "\t", "-c", sql],
         capture_output=True, text=True,
     )

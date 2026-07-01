@@ -121,7 +121,7 @@ def api_get(client, path):
 def _psql(sql: str) -> str:
     result = subprocess.run(
         ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro_user", "-d", "agrocollective",
+         "psql", "-U", "agro", "-d", "agrocollective",
          "-t", "-A", "-F", "\t", "-c", sql],
         capture_output=True, text=True,
     )
@@ -153,6 +153,30 @@ def get_region_ids() -> dict[str, str]:
             f"Encontradas: {list(mapping.keys())}"
         )
     return mapping
+
+
+def get_crop_ids() -> list[str]:
+    """Returns [olivo, almendro, vina] UUID strings in order."""
+    rows = _psql_rows("SELECT id::text, name FROM crops;")
+    crop_map = {r[1]: r[0] for r in rows if len(r) == 2}
+    return [
+        crop_map.get("olivo"),
+        crop_map.get("almendro"),
+        crop_map.get("vina"),
+    ]
+
+
+def get_soil_ids() -> list[str]:
+    """Returns [arenoso, franco, arcilloso, franco-arenoso, franco-arcilloso] UUID strings in order."""
+    rows = _psql_rows("SELECT id::text, name FROM soils;")
+    soil_map = {r[1]: r[0] for r in rows if len(r) == 2}
+    return [
+        soil_map.get("arenoso"),
+        soil_map.get("franco"),
+        soil_map.get("arcilloso"),
+        soil_map.get("franco-arenoso"),
+        soil_map.get("franco-arcilloso"),
+    ]
 
 # =============================================================================
 # PASO 1 — Usuario
@@ -320,7 +344,7 @@ def setup_historical_data(plot_ids: list[str | None]) -> None:
     sql_block = "\n".join(sqls)
     result = subprocess.run(
         ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro_user", "-d", "agrocollective", "-c", sql_block],
+         "psql", "-U", "agro", "-d", "agrocollective", "-c", sql_block],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
@@ -340,7 +364,7 @@ def verify() -> None:
     step("Verificacion final")
     result = subprocess.run(
         ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro_user", "-d", "agrocollective", "-c",
+         "psql", "-U", "agro", "-d", "agrocollective", "-c",
          "SELECT "
          "(SELECT count(*) FROM farms f "
          "  JOIN regions r ON f.region_id=r.id) AS fincas_con_region, "
@@ -367,10 +391,13 @@ def main():
     region_ids = get_region_ids()
     info(f"Regiones resueltas: { {k: v[:8]+'...' for k, v in region_ids.items()} }")
 
+    crop_ids = get_crop_ids()
+    soil_ids = get_soil_ids()
+
     with httpx.Client(timeout=15) as client:
         setup_user(client)
         farm_ids = setup_farms(client, region_ids)
-        plot_ids = setup_plots(client, farm_ids, CROP_IDS, SOIL_IDS)
+        plot_ids = setup_plots(client, farm_ids, crop_ids, soil_ids)
 
     setup_historical_data(plot_ids)
     verify()
