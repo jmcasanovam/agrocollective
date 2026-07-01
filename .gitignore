@@ -150,3 +150,9 @@ docker-compose.*.yml
 
 */sucio.md.agents/
 skills-lock.*
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
+!frontend/src/lib/
+!frontend/.env.example
+
