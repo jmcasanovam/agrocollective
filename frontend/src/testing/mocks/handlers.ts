@@ -1,35 +1,31 @@
 import { http, HttpResponse } from "msw";
+import type { Plot } from "@/features/plots/types";
 
-import type { PlotsResponse } from "@/features/plots/types";
-
-const MOCK_PLOTS: PlotsResponse = {
-  items: [
-    {
-      id: "p001",
-      farm_id: "f001",
-      name: "Parcela 001",
-      crop_type: "olivo",
-      region_code: "VALENCIA",
-      area_ha: 2.5,
-      created_at: "2025-01-01T00:00:00Z",
-    },
-    {
-      id: "p002",
-      farm_id: "f001",
-      name: "Parcela 002",
-      crop_type: "tomate",
-      region_code: "VALENCIA",
-      area_ha: 1.0,
-      created_at: "2025-01-01T00:00:00Z",
-    },
-  ],
-  total: 2,
-  page: 1,
-  page_size: 20,
-};
+const MOCK_PLOTS: Plot[] = [
+  {
+    id: "p001",
+    farm_id: "f001",
+    crop_id: "crop-olivo-id",
+    soil_id: "soil-franco-id",
+    name: "Parcela 001",
+    area_ha: 2.5,
+    management_profile: "Riego deficitario controlado",
+    hash_plot: "hash-001",
+  },
+  {
+    id: "p002",
+    farm_id: "f001",
+    crop_id: "crop-tomate-id",
+    soil_id: "soil-arenoso-id",
+    name: "Parcela 002",
+    area_ha: 1.0,
+    management_profile: "Estándar SiAR",
+    hash_plot: "hash-002",
+  },
+];
 
 export const handlers = [
-  http.get("*/api/v1/plots", () => {
+  http.get("*/farms/:farmId/plots", () => {
     return HttpResponse.json(MOCK_PLOTS);
   }),
 ];
