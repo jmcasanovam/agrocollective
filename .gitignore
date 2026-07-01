@@ -150,3 +150,18 @@ docker-compose.*.yml
 
 */sucio.md.agents/
 skills-lock.*
+
+# Frontend and Node dependencies
+node_modules/
+.next/
+*.tsbuildinfo
+.env.local
+.env.*.local
+
+# Agent/Claude configs
+AGENTS.md
+CLAUDE.md
+
+# Simulation ground truth
+outliers_ground_truth.jsonl
+
