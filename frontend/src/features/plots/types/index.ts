@@ -1,19 +1,38 @@
-export type CropType = "olivo" | "tomate" | "almendro" | "vina" | "naranjo";
-export type RegionCode = "VALENCIA" | "GUADIX_BAZA";
+export interface Crop {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface Soil {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 export interface Plot {
   id: string;
   farm_id: string;
+  crop_id: string;
+  soil_id: string;
   name: string;
-  crop_type: CropType;
-  region_code: RegionCode;
   area_ha: number | null;
-  created_at: string;
+  management_profile: string | null;
+  hash_plot: string | null;
 }
 
-export interface PlotsResponse {
-  items: Plot[];
-  total: number;
-  page: number;
-  page_size: number;
+export interface PlotCreate {
+  crop_id: string;
+  soil_id: string;
+  name: string;
+  area_ha?: number | null;
+  management_profile?: string | null;
+}
+
+export interface PlotUpdate {
+  crop_id?: string;
+  soil_id?: string;
+  name?: string;
+  area_ha?: number | null;
+  management_profile?: string | null;
 }

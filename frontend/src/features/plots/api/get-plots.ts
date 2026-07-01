@@ -1,22 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-
 import { apiClient } from "@/lib/api-client";
+import type { Plot } from "../types";
 
-import type { PlotsResponse } from "../types";
-
-export const plotsKeys = {
-  all: ["plots"] as const,
-  list: (params?: Record<string, unknown>) => [...plotsKeys.all, "list", params] as const,
-};
-
-async function fetchPlots(): Promise<PlotsResponse> {
-  const { data } = await apiClient.get<PlotsResponse>("/api/v1/plots");
-  return data;
-}
-
-export function usePlots() {
+export function usePlots(farmId: string | null) {
   return useQuery({
-    queryKey: plotsKeys.list(),
-    queryFn: fetchPlots,
+    queryKey: ["farms", farmId, "plots"],
+    queryFn: async () => {
+      if (!farmId) return [];
+      const { data } = await apiClient.get<Plot[]>(`/farms/${farmId}/plots`);
+      return data;
+    },
+    enabled: !!farmId,
   });
 }
