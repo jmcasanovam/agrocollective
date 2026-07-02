@@ -11,8 +11,17 @@ interface PageProps {
   params: Promise<{ plotId: string }>;
 }
 
+import { usePlot } from "@/features/plots/api/get-plot";
+
 function PlotDeviceManager({ plotId }: { plotId: string }) {
-  const { data: device, isLoading } = useDevice(plotId);
+  const { data: device, isLoading: isDeviceLoading } = useDevice(plotId);
+  const selectedFarm = useFarmStore((state) => state.selectedFarm);
+  const { data: plot, isLoading: isPlotLoading } = usePlot({
+    farmId: selectedFarm?.id ?? null,
+    plotId,
+  });
+
+  const isLoading = isDeviceLoading || isPlotLoading;
 
   if (isLoading) {
     return (
@@ -24,7 +33,7 @@ function PlotDeviceManager({ plotId }: { plotId: string }) {
   }
 
   if (!device) {
-    return <DevicePairCard plotId={plotId} />;
+    return <DevicePairCard plotId={plotId} plot={plot ?? null} />;
   }
 
   return <DeviceStatusCard plotId={plotId} device={device} />;

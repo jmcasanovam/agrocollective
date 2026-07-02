@@ -1,44 +1,95 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, useEffect } from "react";
 import { useCreateDevice } from "../api/create-device";
-
-const pairSchema = z.object({
-  code: z.string().min(1, "El código del dispositivo es obligatorio"),
-});
-
-type PairFormData = z.infer<typeof pairSchema>;
+import { useUpdateDevice } from "../api/update-device";
+import { useAssignSensors } from "../api/assign-sensors";
+import { useSensors } from "../api/get-sensors";
+import type { Plot } from "@/features/plots/types";
 
 interface DevicePairCardProps {
   plotId: string;
+  plot: Plot | null;
 }
 
-export function DevicePairCard({ plotId }: DevicePairCardProps) {
+const generateDeviceCode = (plotName: string | undefined, plotId: string) => {
+  if (plotName && /^Sim-P\d+$/i.test(plotName)) {
+    const num = plotName.replace(/Sim-P/i, "");
+    return `AGRO-P${num}-001`;
+  }
+  if (plotName && /^P\d+$/i.test(plotName)) {
+    return `AGRO-${plotName.toUpperCase()}-001`;
+  }
+  return `AGRO-P-${plotId.substring(0, 8).toUpperCase()}`;
+};
+
+const getSensorLabel = (type: string, name: string) => {
+  switch (type) {
+    case "air_temperature":
+      return `temperatura del aire (${name})`;
+    case "relative_humidity":
+      return `humedad relativa (${name})`;
+    case "soil_temperature":
+      return `temperatura del suelo (${name})`;
+    case "soil_humidity":
+      return `humedad del suelo (${name})`;
+    default:
+      return `${type} (${name})`;
+  }
+};
+
+export function DevicePairCard({ plotId, plot }: DevicePairCardProps) {
   const createDeviceMutation = useCreateDevice(plotId);
+  const updateDeviceMutation = useUpdateDevice(plotId);
+  const assignSensorsMutation = useAssignSensors(plotId);
+  const { data: sensors, isLoading: isSensorsLoading } = useSensors();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<PairFormData>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(pairSchema as any),
-    defaultValues: { code: "" },
-  });
+  const [isActive, setIsActive] = useState<boolean>(true);
+  const [deselectedSensorIds, setDeselectedSensorIds] = useState<string[]>([]);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const onSubmit = (data: PairFormData) => {
-    createDeviceMutation.mutate(
-      { code: data.code },
-      {
-        onSuccess: () => {
-          reset();
-        },
-      },
+  const selectedSensorIds = sensors
+    ? sensors.filter((s) => !deselectedSensorIds.includes(s.id)).map((s) => s.id)
+    : [];
+
+  const generatedCode = generateDeviceCode(plot?.name, plotId);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessMsg(null);
+    try {
+      const device = await createDeviceMutation.mutateAsync({ code: generatedCode });
+
+      if (!isActive) {
+        await updateDeviceMutation.mutateAsync({
+          deviceId: device.id,
+          data: { is_active: false },
+        });
+      }
+
+      if (selectedSensorIds.length > 0) {
+        await assignSensorsMutation.mutateAsync({
+          deviceId: device.id,
+          sensorIds: selectedSensorIds,
+        });
+      }
+
+      setSuccessMsg("Dispositivo registrado correctamente.");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleSensor = (id: string) => {
+    setDeselectedSensorIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
     );
   };
+
+  const isPending =
+    createDeviceMutation.isPending ||
+    updateDeviceMutation.isPending ||
+    assignSensorsMutation.isPending;
 
   return (
     <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5">
@@ -68,49 +119,85 @@ export function DevicePairCard({ plotId }: DevicePairCardProps) {
         <h3 className="text-[15px] font-bold text-[#24302a] m-0">Dispositivo IoT</h3>
       </div>
 
-      {/* Empty state */}
-      <div className="text-center py-2.5 px-1">
-        <div className="w-[46px] h-[46px] rounded-xl bg-[#f2efe6] flex items-center justify-center mx-auto mb-3">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#a3aca2"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M2 2l20 20" />
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-          </svg>
-        </div>
-        <div className="text-sm font-semibold text-[#3a4a42] mb-1">Sin dispositivo</div>
-        <p className="text-xs text-[#8a978d] leading-relaxed m-0 mb-3.5">
-          Esta parcela aún no tiene un nodo ESP32 emparejado.
+      {/* Content */}
+      <div className="py-1">
+        <p className="text-xs text-[#8a978d] leading-relaxed m-0 mb-4">
+          Esta parcela aún no tiene un nodo IoT emparejado.
         </p>
 
         {createDeviceMutation.isError && (
-          <div className="mb-3.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600 text-left">
-            El dispositivo no existe o ya está emparejado a otra parcela.
+          <div className="mb-4 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
+            Error al crear el dispositivo.
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <div>
-            <input
-              type="text"
-              placeholder="Código, ej. AGRO-P00-001"
-              disabled={createDeviceMutation.isPending}
-              {...register("code")}
-              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 disabled:opacity-60 font-[inherit]"
-            />
-            {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
+        {successMsg && (
+          <div className="mb-4 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+            {successMsg}
           </div>
+        )}
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold text-[#6b7a70] uppercase mb-1">
+              código generado:
+            </label>
+            <div className="w-full h-10 border border-[#e2dcd0] bg-[#fcfbfa] rounded-lg px-3 text-sm text-[#4b5550] flex items-center font-mono select-all">
+              {generatedCode}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              disabled={isPending}
+              className="w-4 h-4 rounded border-[#d9d3c5] text-[#2f5d3f] focus:ring-[#2f5d3f]/30"
+            />
+            <label
+              htmlFor="isActive"
+              className="text-xs font-semibold text-[#3a4a42] cursor-pointer"
+            >
+              Dispositivo activo
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-[#6b7a70] uppercase mb-1">
+              selección de sensores:
+            </label>
+            {isSensorsLoading ? (
+              <p className="text-[10px] text-[#8a978d]">Cargando sensores...</p>
+            ) : (
+              <div className="space-y-1.5 bg-[#fcfbfa] border border-[#e2dcd0] rounded-lg p-2.5">
+                {sensors?.map((sensor) => (
+                  <div key={sensor.id} className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      id={sensor.id}
+                      checked={!deselectedSensorIds.includes(sensor.id)}
+                      onChange={() => toggleSensor(sensor.id)}
+                      disabled={isPending}
+                      className="w-3.5 h-3.5 rounded border-[#d9d3c5] text-[#2f5d3f] focus:ring-[#2f5d3f]/30"
+                    />
+                    <label
+                      htmlFor={sensor.id}
+                      className="text-xs text-[#4b5550] cursor-pointer select-none"
+                    >
+                      {getSensorLabel(sensor.sensor_type, sensor.name)}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             type="submit"
-            disabled={createDeviceMutation.isPending}
-            className="h-[38px] px-4 border-none rounded-[9px] bg-[#2f5d3f] text-white text-[13.5px] font-semibold cursor-pointer hover:bg-[#264b33] disabled:opacity-60 inline-flex items-center gap-[7px] font-[inherit]"
+            disabled={isPending || isSensorsLoading}
+            className="w-full h-10 border-none rounded-lg bg-[#2f5d3f] text-white text-[13.5px] font-semibold cursor-pointer hover:bg-[#264b33] disabled:opacity-60 inline-flex items-center justify-center gap-[7px]"
           >
             <svg
               width="15"
@@ -125,7 +212,7 @@ export function DevicePairCard({ plotId }: DevicePairCardProps) {
               <path d="M5 12h14" />
               <path d="M12 5v14" />
             </svg>
-            {createDeviceMutation.isPending ? "Vinculando..." : "Emparejar dispositivo"}
+            {isPending ? "Creando..." : "Crear dispositivo"}
           </button>
         </form>
       </div>
