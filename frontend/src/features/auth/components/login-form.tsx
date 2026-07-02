@@ -107,7 +107,7 @@ export function LoginForm() {
             placeholder="ejemplo@correo.com"
             disabled={isLoading}
             {...register("email")}
-            className="w-full h-11 border border-[#d9d3c5] rounded-lg px-3.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40 disabled:opacity-60"
+            className="w-full h-11 border border-[#d9d3c5] rounded-lg px-3.5 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40 disabled:opacity-60"
           />
           {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
         </div>
@@ -119,7 +119,7 @@ export function LoginForm() {
             placeholder="••••••••"
             disabled={isLoading}
             {...register("password")}
-            className="w-full h-11 border border-[#d9d3c5] rounded-lg px-3.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40 disabled:opacity-60"
+            className="w-full h-11 border border-[#d9d3c5] rounded-lg px-3.5 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40 disabled:opacity-60"
           />
           {errors.password && (
             <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>

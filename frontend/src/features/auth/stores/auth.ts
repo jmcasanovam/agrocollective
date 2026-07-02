@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiClient } from "@/lib/api-client";
+import { useFarmStore } from "@/features/farms/stores/farm";
 import type { User } from "../types";
 
 interface AuthState {
@@ -33,6 +34,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     get().setToken(null);
+    try {
+      useFarmStore.getState().clearSelectedFarm();
+    } catch (e) {
+      console.error("Error clearing selected farm on logout:", e);
+    }
   },
 
   initAuth: async () => {
