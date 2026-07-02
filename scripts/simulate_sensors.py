@@ -424,6 +424,15 @@ class SensorSimulator:
             max(wp_limit, min(fc_limit, self._sh + random.gauss(0, 0.4))), 2
         )
 
+        # Inyectar anomalías de sensor/microclima para cubrir todas las variables medidas
+        if self.plot_index == 1:
+            # Parcela 1: Anomalía de temperatura (ej. calor local / mala ubicación del sensor)
+            air_temp = round(air_temp + 4.5, 2)
+            soil_temp = round(soil_temp + 3.5, 2)
+        elif self.plot_index == 5:
+            # Parcela 5: Anomalía de humedad del aire (ej. sensor descalibrado, lectura baja)
+            air_hum = round(max(10.0, air_hum - 20.0), 2)
+
         battery = int(random.uniform(*BATTERY_RANGE))
 
         return {
