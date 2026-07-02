@@ -210,3 +210,85 @@ def get_performance_history(
 ):
     _get_plot_or_404(db, plot_id, current_user.id)
     return performance_history_repository.get_history_for_plot(db, plot_id, limit)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Datos de Clima SiAR
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/plots/{plot_id}/weather",
+    response_model=list[dict]
+)
+def get_plot_weather_history(
+    plot_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Devuelve los últimos 30 días de registros climáticos SiAR de la estación
+    asociada a la parcela del usuario.
+    """
+    plot = _get_plot_or_404(db, plot_id, current_user.id)
+    farm = plot.farm
+    if not farm or not farm.region:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La parcela no está asociada a una finca o región con estación SiAR."
+        )
+    
+    station_code = farm.region.siar_station_code
+    if not station_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La región no tiene código de estación SiAR configurado."
+        )
+
+    # Consultar InfluxDB
+    from app.database.influx import get_influx_client, get_query_api
+    from app.core.config import settings
+
+    flux = f"""
+    from(bucket: "{settings.INFLUXDB_BUCKET_WEATHER}")
+      |> range(start: 2025-06-01T00:00:00Z)
+      |> filter(fn: (r) => r._measurement == "weather")
+      |> filter(fn: (r) => r.siar_station_code == "{station_code}")
+      |> pivot(
+           rowKey:    ["_time", "siar_station_code"],
+           columnKey: ["_field"],
+           valueColumn: "_value"
+         )
+      |> sort(columns: ["_time"], desc: true)
+      |> limit(n: 30)
+    """
+
+    results = []
+    try:
+        client = get_influx_client()
+        try:
+            tables = get_query_api(client).query(flux, org=settings.INFLUXDB_ORG)
+            for table in tables:
+                for record in table.records:
+                    row = record.values
+                    results.append({
+                        "date": row.get("_time").strftime("%Y-%m-%d") if row.get("_time") else None,
+                        "station_code": row.get("siar_station_code"),
+                        "air_temp": row.get("air_temp"),
+                        "air_temp_max": row.get("air_temp_max"),
+                        "air_temp_min": row.get("air_temp_min"),
+                        "relative_humidity": row.get("relative_humidity"),
+                        "relative_humidity_max": row.get("relative_humidity_max"),
+                        "relative_humidity_min": row.get("relative_humidity_min"),
+                        "soil_temp": row.get("soil_temp"),
+                        "eto": row.get("eto"),
+                        "precipitation": row.get("precipitation"),
+                    })
+        finally:
+            client.close()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al consultar datos SiAR desde InfluxDB: {exc}"
+        )
+
+    return results
