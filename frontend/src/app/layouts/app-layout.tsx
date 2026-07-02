@@ -56,8 +56,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // If on login or farms, render without main app shell layout (sidebar/topbar)
-  if (pathname === "/login" || pathname === "/farms") {
+  // If on login or farms (when no farm is selected yet), render without main app shell layout (sidebar/topbar)
+  if (pathname === "/login" || (pathname === "/farms" && !selectedFarmId)) {
     return <>{children}</>;
   }
 
