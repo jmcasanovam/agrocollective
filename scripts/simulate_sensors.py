@@ -26,6 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import paho.mqtt.publish as mqtt_publish
+import httpx
 from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient
 
@@ -35,15 +36,15 @@ load_dotenv()
 # CONFIG
 # =============================================================================
 
-MQTT_HOST = "localhost"
-MQTT_PORT = 1883
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 N_PLOTS   = 10
 DEVICE_PREFIX = "AGRO-P"
 SEND_DELAY_SECONDS = 0.02   # pausa entre mensajes en modo FAST
 
-# Ventana de simulación = año móvil del SiAR
-START_DATE = date(2025, 7, 1)
-END_DATE   = date(2026, 6, 30)
+# Ventana de simulación - determinada dinámicamente desde InfluxDB
+START_DATE = None
+END_DATE   = None
 
 # 6 h de cadencia → 4 lecturas por dispositivo y día
 HOURS_PER_DAY = [0, 6, 12, 18]
@@ -106,13 +107,89 @@ def _psql(sql: str) -> str:
 
 
 def _psql_rows(sql: str) -> list[list[str]]:
-    out = _psql(sql)
-    rows = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if parts and parts[0]:
-            rows.append(parts)
-    return rows
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            result = db.execute(text(sql))
+            return [[str(val) for val in row] for row in result.all()]
+        finally:
+            db.close()
+    except Exception:
+        out = _psql(sql)
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if parts and parts[0]:
+                rows.append(parts)
+        return rows
+
+
+def load_simulation_config_from_api() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """
+    Consulta la API REST del backend para construir los mapas device_station,
+    device_profile y device_soil dinámicamente sin usar queries SQL directas.
+    """
+    email = "simulacion@agrocollective.com"
+    password = "Simul2026!"
+    base_url = "http://localhost:8000"
+    
+    headers = {}
+    print("  Conectando a la API para resolver mapeos de dispositivos...")
+    with httpx.Client(timeout=15) as client:
+        try:
+            r = client.post(f"{base_url}/auth/login", json={"email": email, "password": password})
+            if r.status_code != 200:
+                print("  [WARN] Login de API fallido. Usando fallbacks de base de datos.")
+                return {}, {}, {}
+            token = r.json()["access_token"]
+            headers["Authorization"] = f"Bearer {token}"
+            
+            # Obtener catálogo de regiones (para código de estación SiAR)
+            r = client.get(f"{base_url}/regions")
+            regions = {item["id"]: item["siar_station_code"] for item in r.json() if "siar_station_code" in item}
+            
+            # Obtener catálogo de suelos (para nombre de suelo)
+            r = client.get(f"{base_url}/soils")
+            soils = {item["id"]: item["name"] for item in r.json()}
+            
+            # Obtener fincas
+            r = client.get(f"{base_url}/farms", headers=headers)
+            farms = r.json()
+            
+            device_station = {}
+            device_profile = {}
+            device_soil = {}
+            
+            for farm in farms:
+                farm_id = farm["id"]
+                region_id = farm.get("region_id")
+                station = regions.get(region_id, "V17")
+                
+                # Obtener parcelas
+                r = client.get(f"{base_url}/farms/{farm_id}/plots", headers=headers)
+                plots = r.json()
+                for plot in plots:
+                    plot_id = plot["id"]
+                    profile = plot.get("management_profile", "moderado")
+                    soil_id = plot.get("soil_id")
+                    soil_name = soils.get(soil_id, "franco")
+                    
+                    # Obtener dispositivo de la parcela
+                    r = client.get(f"{base_url}/plots/{plot_id}/devices", headers=headers)
+                    if r.status_code == 200:
+                        device = r.json()
+                        if device and device.get("is_active"):
+                            code = device["code"]
+                            device_station[code] = station
+                            device_profile[code] = profile
+                            device_soil[code] = soil_name
+            
+            return device_station, device_profile, device_soil
+        except Exception as e:
+            print(f"  [WARN] Error al consultar API ({type(e).__name__}): {e}. Usando fallbacks de base de datos.")
+            return {}, {}, {}
 
 
 def load_device_station_map() -> dict[str, str]:
@@ -183,13 +260,15 @@ def load_soil_type_map() -> dict[str, str]:
 # =============================================================================
 
 
-def load_weather_data() -> dict[str, dict[date, dict]]:
+def load_weather_data() -> tuple[dict[str, dict[date, dict]], date, date]:
     """
-    Devuelve {station_code: {day: {field: float}}} para toda la ventana.
+    Devuelve (weather, start_date, end_date).
+    weather es {station_code: {day: {field: float}}} para toda la ventana.
     Usa pivot() para obtener todos los campos de 'weather' en una sola query.
+    Determina start_date y end_date dinámicamente según los timestamps de los registros.
     """
     required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
-                "INFLUXDB_ORG", "INFLUXDB_BUCKET"]
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_WEATHER"]
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         print(f"[ERR] Variables de entorno InfluxDB faltantes: {', '.join(missing)}")
@@ -198,11 +277,11 @@ def load_weather_data() -> dict[str, dict[date, dict]]:
     url    = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
     token  = os.environ["INFLUXDB_TOKEN"]
     org    = os.environ["INFLUXDB_ORG"]
-    bucket = os.environ["INFLUXDB_BUCKET"]
+    bucket = os.environ["INFLUXDB_BUCKET_WEATHER"]
 
     flux = f'''
 from(bucket: "{bucket}")
-  |> range(start: 2025-07-01T00:00:00Z, stop: 2026-07-01T00:00:00Z)
+  |> range(start: 2025-06-23T00:00:00Z)
   |> filter(fn: (r) => r._measurement == "weather")
   |> pivot(
        rowKey:    ["_time", "siar_station_code"],
@@ -224,18 +303,27 @@ from(bucket: "{bucket}")
     )
 
     weather: dict[str, dict[date, dict]] = {}
+    all_dates = []
     for table in tables:
         for rec in table.records:
             station = rec.values.get("siar_station_code", "")
             if not station:
                 continue
             day = rec.get_time().date()
+            all_dates.append(day)
             row = {f: float(rec.values[f]) for f in FIELDS if rec.values.get(f) is not None}
             weather.setdefault(station, {})[day] = row
 
+    if not all_dates:
+        print("\n[ERR] No se encontraron datos meteorológicos en InfluxDB. Corre download_siar.py primero.")
+        sys.exit(1)
+
+    start_date = min(all_dates)
+    end_date = max(all_dates)
+
     summary = ", ".join(f"{k}:{len(v)}d" for k, v in weather.items())
     print(f" {sum(len(v) for v in weather.values())} registros ({summary})")
-    return weather
+    return weather, start_date, end_date
 
 
 # =============================================================================
@@ -404,7 +492,37 @@ def send_message(payload: dict, dry_run: bool) -> None:
 # =============================================================================
 
 
+def ensure_bucket_exists() -> None:
+    """Asegura que el bucket de mediciones de InfluxDB exista."""
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_MEASUREMENTS"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        return
+
+    url    = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token  = os.environ["INFLUXDB_TOKEN"]
+    org    = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_MEASUREMENTS"]
+
+    client = InfluxDBClient(url=url, token=token, org=org)
+    try:
+        buckets_api = client.buckets_api()
+        existing = buckets_api.find_bucket_by_name(bucket)
+        if not existing:
+            orgs_api = client.organizations_api()
+            orgs = orgs_api.find_organizations(org=org)
+            if orgs:
+                buckets_api.create_bucket(bucket_name=bucket, org_id=orgs[0].id)
+                print(f"  [INFO] Creado bucket de InfluxDB '{bucket}'.")
+    except Exception as exc:
+        print(f"  [WARN] No se pudo verificar/crear el bucket '{bucket}': {exc}")
+    finally:
+        client.close()
+
+
 def main() -> None:
+    ensure_bucket_exists()
     parser = argparse.ArgumentParser(
         description="Simulador de sensores AgroCollective (Sprint 2 — SiAR-anclado)"
     )
@@ -421,13 +539,15 @@ def main() -> None:
 
     print("\n=== AgroCollective — Simulador SiAR-anclado (Sprint 2) ===")
 
-    # Resolver device→estación, perfil y tipo de suelo desde BD (con fallback)
-    device_station = load_device_station_map()
-    device_profile = load_management_profile_map()
-    device_soil    = load_soil_type_map()
+    # Resolver device→estación, perfil y tipo de suelo desde API (con fallback a SQL)
+    device_station, device_profile, device_soil = load_simulation_config_from_api()
+    if not device_station:
+        device_station = load_device_station_map()
+        device_profile = load_management_profile_map()
+        device_soil    = load_soil_type_map()
 
     # Cargar datos climáticos de InfluxDB
-    weather = load_weather_data()
+    weather, START_DATE, END_DATE = load_weather_data()
 
     # Construir simuladores
     simulators = []

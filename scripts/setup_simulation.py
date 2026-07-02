@@ -92,6 +92,7 @@ HARVEST_DATE_BY_CROP_IDX = {
     2: date(2025, 9, 25),   # vina:     cosecha sep
 }
 
+# Ventana de simulación (se determina dinámicamente si InfluxDB tiene datos)
 SIM_START = date(2025, 7, 1)
 SIM_END   = date(2026, 6, 30)
 
@@ -128,37 +129,114 @@ def _psql(sql: str) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 def _psql_rows(sql: str) -> list[list[str]]:
-    out = _psql(sql)
-    rows = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if parts and parts[0]:
-            rows.append(parts)
-    return rows
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            result = db.execute(text(sql))
+            return [[str(val) for val in row] for row in result.all()]
+        finally:
+            db.close()
+    except Exception:
+        out = _psql(sql)
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if parts and parts[0]:
+                rows.append(parts)
+        return rows
 
 # =============================================================================
 # PASO 0 — Resolver region_ids
 # =============================================================================
 
-def get_region_ids() -> dict[str, str]:
-    """Returns {region_code: region_uuid}. Fails if seed_data.py no corrió."""
-    rows = _psql_rows(
-        "SELECT code, id::text FROM regions WHERE code IN ('VALENCIA','BAZA');"
-    )
-    mapping = {r[0]: r[1] for r in rows if len(r) == 2}
+def wipe_existing_data():
+    """Wipes all operational tables in PostgreSQL to start fresh."""
+    step("Wiping existing operational data in Postgres")
+    sql = "TRUNCATE TABLE users, farms, plots, devices, irrigation_records, harvests CASCADE;"
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text(sql))
+            db.commit()
+            ok("Postgres tables wiped successfully.")
+        finally:
+            db.close()
+    except Exception:
+        # Fallback to docker exec psql
+        import subprocess
+        subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql],
+            capture_output=True
+        )
+        ok("Postgres tables wiped via fallback.")
+
+
+def wipe_influxdb_measurements():
+    """Wipes all sensor readings from InfluxDB measurements bucket."""
+    step("Wiping existing sensor readings in InfluxDB")
+    import os
+    try:
+        from influxdb_client import InfluxDBClient
+    except ImportError:
+        warn("influxdb_client not installed. Skipping InfluxDB wipe.")
+        return
+
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_MEASUREMENTS"]
+    if any(not os.getenv(k) for k in required):
+        warn("Missing InfluxDB env vars. Skipping InfluxDB wipe.")
+        return
+
+    url = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token = os.environ["INFLUXDB_TOKEN"]
+    org = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_MEASUREMENTS"]
+    
+    try:
+        client = InfluxDBClient(url=url, token=token, org=org, timeout=5000)
+        try:
+            client.delete_api().delete(
+                start="1970-01-01T00:00:00Z",
+                stop="2030-01-01T00:00:00Z",
+                predicate='_measurement="measurements"',
+                bucket=bucket,
+                org=org
+            )
+            ok("InfluxDB measurements bucket wiped.")
+        finally:
+            client.close()
+    except Exception as e:
+        warn(f"Failed to wipe InfluxDB: {e}")
+
+
+def get_region_ids(client) -> dict[str, str]:
+    """Returns {region_code: region_uuid} via API."""
+    r = client.get(f"{API_BASE_URL}/regions")
+    if r.status_code != 200:
+        bail("Error fetching regions from API", r)
+    data = r.json()
+    mapping = {item["code"]: item["id"] for item in data if item["code"] in ("VALENCIA", "BAZA")}
     if len(mapping) < 2:
         bail(
-            f"Regiones VALENCIA/BAZA no encontradas en BD. "
+            f"Regiones VALENCIA/BAZA no encontradas en catálogo de la API. "
             f"Ejecuta primero: python scripts/seed_data.py. "
             f"Encontradas: {list(mapping.keys())}"
         )
     return mapping
 
 
-def get_crop_ids() -> list[str]:
-    """Returns [olivo, almendro, vina] UUID strings in order."""
-    rows = _psql_rows("SELECT id::text, name FROM crops;")
-    crop_map = {r[1]: r[0] for r in rows if len(r) == 2}
+def get_crop_ids(client) -> list[str]:
+    """Returns [olivo, almendro, vina] UUID strings in order via API."""
+    r = client.get(f"{API_BASE_URL}/crops")
+    if r.status_code != 200:
+        bail("Error fetching crops from API", r)
+    data = r.json()
+    crop_map = {item["name"]: item["id"] for item in data}
     return [
         crop_map.get("olivo"),
         crop_map.get("almendro"),
@@ -166,10 +244,13 @@ def get_crop_ids() -> list[str]:
     ]
 
 
-def get_soil_ids() -> list[str]:
-    """Returns [arenoso, franco, arcilloso, franco-arenoso, franco-arcilloso] UUID strings in order."""
-    rows = _psql_rows("SELECT id::text, name FROM soils;")
-    soil_map = {r[1]: r[0] for r in rows if len(r) == 2}
+def get_soil_ids(client) -> list[str]:
+    """Returns [arenoso, franco, arcilloso, franco-arenoso, franco-arcilloso] UUID strings in order via API."""
+    r = client.get(f"{API_BASE_URL}/soils")
+    if r.status_code != 200:
+        bail("Error fetching soils from API", r)
+    data = r.json()
+    soil_map = {item["name"]: item["id"] for item in data}
     return [
         soil_map.get("arenoso"),
         soil_map.get("franco"),
@@ -301,7 +382,7 @@ def setup_plots(
 # =============================================================================
 
 def setup_historical_data(plot_ids: list[str | None]) -> None:
-    step("Insertando riego (año móvil 2025-07-01→2026-06-30) y cosechas por cultivo")
+    step(f"Insertando riego (año móvil {SIM_START}→{SIM_END}) y cosechas por cultivo")
 
     # Semanas dentro de la ventana
     weeks: list[date] = []
@@ -341,20 +422,39 @@ def setup_historical_data(plot_ids: list[str | None]) -> None:
             f"{yld}, {water_consumed}, now(), now()) ON CONFLICT DO NOTHING;"
         )
 
-    sql_block = "\n".join(sqls)
-    result = subprocess.run(
-        ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro", "-d", "agrocollective", "-c", sql_block],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        warn(f"Algunos inserts fallaron (puede ser normal si ya existen): {result.stderr[:300]}")
-    else:
-        active = sum(1 for p in plot_ids if p is not None)
-        ok(
-            f"{len(sqls)} registros  "
-            f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            for sql in sqls:
+                db.execute(text(sql))
+            db.commit()
+            active = sum(1 for p in plot_ids if p is not None)
+            ok(
+                f"{len(sqls)} registros  "
+                f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+            )
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+    except Exception:
+        sql_block = "\n".join(sqls)
+        result = subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql_block],
+            capture_output=True, text=True,
         )
+        if result.returncode != 0:
+            warn(f"Algunos inserts fallaron (puede ser normal si ya existen): {result.stderr[:300]}")
+        else:
+            active = sum(1 for p in plot_ids if p is not None)
+            ok(
+                f"{len(sqls)} registros  "
+                f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+            )
 
 # =============================================================================
 # PASO 5 — Verificar
@@ -362,9 +462,7 @@ def setup_historical_data(plot_ids: list[str | None]) -> None:
 
 def verify() -> None:
     step("Verificacion final")
-    result = subprocess.run(
-        ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro", "-d", "agrocollective", "-c",
+    sql = (
          "SELECT "
          "(SELECT count(*) FROM farms f "
          "  JOIN regions r ON f.region_id=r.id) AS fincas_con_region, "
@@ -374,27 +472,102 @@ def verify() -> None:
          "(SELECT count(*) FROM irrigation_records) AS registros_riego, "
          "(SELECT count(*) FROM harvests) AS cosechas, "
          "(SELECT string_agg(DISTINCT r.code, '/' ORDER BY r.code) "
-         "  FROM farms f JOIN regions r ON f.region_id=r.id) AS regiones;"],
-        capture_output=True, text=True,
+         "  FROM farms f JOIN regions r ON f.region_id=r.id) AS regiones;"
     )
-    print(result.stdout)
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            res = db.execute(text(sql)).first()
+            print(f"  fincas_con_region: {res[0]}\n  parcelas_con_perfil: {res[1]}\n  dispositivos: {res[2]}\n  registros_riego: {res[3]}\n  cosechas: {res[4]}\n  regiones: {res[5]}")
+        finally:
+            db.close()
+    except Exception:
+        result = subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql],
+            capture_output=True, text=True,
+        )
+        print(result.stdout)
 
-# =============================================================================
-# MAIN
-# =============================================================================
+def get_simulation_dates() -> tuple[date, date]:
+    """
+    Intenta obtener el rango de fechas de clima desde InfluxDB.
+    Si InfluxDB está vacío o falla, devuelve el rango por defecto (2025-06-23 a ayer).
+    """
+    fallback_start = date(2025, 6, 23)
+    fallback_end = date.today() - timedelta(days=1)
+    
+    import os
+    try:
+        from influxdb_client import InfluxDBClient
+    except ImportError:
+        return fallback_start, fallback_end
+
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_WEATHER"]
+    if any(not os.getenv(k) for k in required):
+        return fallback_start, fallback_end
+
+    url = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token = os.environ["INFLUXDB_TOKEN"]
+    org = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_WEATHER"]
+    
+    try:
+        client = InfluxDBClient(url=url, token=token, org=org, timeout=5000)
+        try:
+            query_first = f'from(bucket: "{bucket}") |> range(start: 2025-06-23T00:00:00Z) |> filter(fn: (r) => r._measurement == "weather") |> first()'
+            query_last = f'from(bucket: "{bucket}") |> range(start: 2025-06-23T00:00:00Z) |> filter(fn: (r) => r._measurement == "weather") |> last()'
+            
+            tables_first = client.query_api().query(query_first)
+            tables_last = client.query_api().query(query_last)
+            
+            times = []
+            for t in tables_first:
+                for r in t.records:
+                    if r.get_time():
+                        times.append(r.get_time().date())
+            if not times:
+                return fallback_start, fallback_end
+            
+            start_date = min(times)
+            
+            times_end = []
+            for t in tables_last:
+                for r in t.records:
+                    if r.get_time():
+                        times_end.append(r.get_time().date())
+            end_date = max(times_end) if times_end else fallback_end
+            
+            return start_date, end_date
+        finally:
+            client.close()
+    except Exception:
+        return fallback_start, fallback_end
+
 
 def main():
+    global SIM_START, SIM_END
+    SIM_START, SIM_END = get_simulation_dates()
     header("AgroCollective — Setup de simulacion (Sprint 2)")
     info(f"API: {API_BASE_URL}")
+    info(f"Rango de simulación: {SIM_START} → {SIM_END}")
     info(f"Parcelas: {N_PLOTS}  (P00-P04 → Valencia, P05-P09 → Baza)")
 
-    region_ids = get_region_ids()
-    info(f"Regiones resueltas: { {k: v[:8]+'...' for k, v in region_ids.items()} }")
-
-    crop_ids = get_crop_ids()
-    soil_ids = get_soil_ids()
+    # 1. Limpiar bases de datos primero
+    wipe_existing_data()
+    wipe_influxdb_measurements()
 
     with httpx.Client(timeout=15) as client:
+        # Resolve IDs via API inside Client context
+        region_ids = get_region_ids(client)
+        info(f"Regiones resueltas: { {k: v[:8]+'...' for k, v in region_ids.items()} }")
+
+        crop_ids = get_crop_ids(client)
+        soil_ids = get_soil_ids(client)
+
         setup_user(client)
         farm_ids = setup_farms(client, region_ids)
         plot_ids = setup_plots(client, farm_ids, crop_ids, soil_ids)
