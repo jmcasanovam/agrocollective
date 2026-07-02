@@ -447,6 +447,39 @@ def setup_weekly_task(cfg: dict, dry_run: bool = False):
         client.close()
 
 
+def check_influx_has_data(cfg: dict) -> bool:
+    """Verifica si ya hay datos de clima en InfluxDB."""
+    client = InfluxDBClient(
+        url=cfg["influx_url"],
+        token=cfg["influx_token"],
+        org=cfg["influx_org"],
+    )
+    try:
+        query_api = client.query_api()
+        # Consulta rápida para contar registros en el bucket para la serie weather
+        query = f'''
+        from(bucket: "{cfg['influx_bucket']}")
+          |> range(start: 2025-07-01T00:00:00Z, stop: 2026-07-01T00:00:00Z)
+          |> filter(fn: (r) => r._measurement == "weather")
+          |> count()
+        '''
+        tables = query_api.query(query)
+        total_records = 0
+        for table in tables:
+            for record in table.records:
+                total_records += record.get_value()
+        
+        log.info("Verificando datos existentes en InfluxDB... Encontrados %d registros de clima.", total_records)
+        # Cada estación tiene ~365 registros. Con 2 estaciones deberíamos tener unos 730 registros.
+        # Si tenemos al menos 600, los datos ya están en el bucket.
+        return total_records > 600
+    except Exception as exc:
+        log.warning("No se pudo consultar InfluxDB para verificar datos existentes: %s. Se procederá con la descarga.", exc)
+        return False
+    finally:
+        client.close()
+
+
 # ------------------------------------------------------------------ #
 # Main                                                                #
 # ------------------------------------------------------------------ #
@@ -462,6 +495,12 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(dry_run=args.dry_run)
+
+    if not args.dry_run:
+        if check_influx_has_data(cfg):
+            log.info("Los datos de clima de SiAR ya están presentes y actualizados en InfluxDB. Omitiendo descarga.")
+            setup_weekly_task(cfg, dry_run=False)
+            sys.exit(0)
 
     # 1. Descarga
     df_all = download_siar(cfg)
