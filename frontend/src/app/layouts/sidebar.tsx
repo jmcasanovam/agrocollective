@@ -7,6 +7,7 @@ import { useAuthStore } from "@/features/auth/stores/auth";
 export function Sidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
 
   const navItems = [
     {
@@ -183,6 +184,13 @@ export function Sidebar() {
           <div className="text-[13px] font-semibold text-[#2f5d3f]">Hoy · 02:00 UTC</div>
           <div className="text-[11px] text-[#7d8c82] mt-0.5">análisis nocturno de parcelas</div>
         </div>
+
+        {/* User email */}
+        {user?.email && (
+          <div className="px-3 pt-2 pb-0.5 text-xs text-[#5c6b62] font-semibold break-all border-t border-[#e3ddce]">
+            {user.email}
+          </div>
+        )}
 
         {/* Logout */}
         <button
