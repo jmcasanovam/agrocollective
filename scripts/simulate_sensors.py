@@ -364,20 +364,22 @@ class SensorSimulator:
 
         # Inyectar fallos físicos en la simulación de riego (anomalías dinámicas)
         if self.plot_index == 3:
-            # Parcela 3: Válvula cerrada/rota. Sin riego. Se seca dinámicamente con ETo.
-            irrig = 0.0
+            # Parcela 3: Riego deficitario severo (20% del riego normal). Se seca dinámicamente con ETo.
+            irrig = 0.2 * IRRIG_MM.get(self.profile, 5.0)
         elif self.plot_index == 7:
-            # Parcela 7: Válvula atascada abierta. Riego masivo diario.
-            irrig = 30.0
+            # Parcela 7: Exceso de riego continuo (doble del riego normal).
+            irrig = 2.0 * IRRIG_MM.get(self.profile, 5.0)
 
         # STOCK: delta modifica el nivel previo; ETo escala por tipo de suelo
         delta  = (precip * 0.8 + irrig * 0.9 - eto * self._dry) * MM_TO_PCT
         
         # Ajustar límites físicos de acumulación de agua según el tipo de anomalía
         if self.plot_index == 3:
-            self._sh = max(self._wp - 5.0, min(self._fc, self._sh + delta))
+            # Límite inferior ligeramente expandido por debajo del punto de marchitez
+            self._sh = max(self._wp - 1.5, min(self._fc, self._sh + delta))
         elif self.plot_index == 7:
-            self._sh = max(self._wp, min(self._fc + 10.0, self._sh + delta))
+            # Límite superior ligeramente expandido por encima de la capacidad de campo
+            self._sh = max(self._wp, min(self._fc + 3.0, self._sh + delta))
         else:
             self._sh = max(self._wp, min(self._fc, self._sh + delta))
 
@@ -416,8 +418,8 @@ class SensorSimulator:
 
         # Humedad del suelo — oscilación intra-día sobre el nivel diario (STOCK)
         # Acotada al rango físico ajustado de la parcela
-        wp_limit = self._wp - 5.0 if self.plot_index == 3 else self._wp
-        fc_limit = self._fc + 10.0 if self.plot_index == 7 else self._fc
+        wp_limit = self._wp - 1.5 if self.plot_index == 3 else self._wp
+        fc_limit = self._fc + 3.0 if self.plot_index == 7 else self._fc
         soil_hum = round(
             max(wp_limit, min(fc_limit, self._sh + random.gauss(0, 0.4))), 2
         )

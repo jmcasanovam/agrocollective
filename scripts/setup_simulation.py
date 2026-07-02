@@ -539,6 +539,11 @@ def get_simulation_dates() -> tuple[date, date]:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Setup de simulación de AgroCollective")
+    parser.add_argument("--wipe-influx", action="store_true", help="Wipe InfluxDB sensor measurements bucket")
+    args = parser.parse_args()
+
     global SIM_START, SIM_END
     SIM_START, SIM_END = get_simulation_dates()
     header("AgroCollective — Setup de simulacion (Sprint 2)")
@@ -548,7 +553,10 @@ def main():
 
     # 1. Limpiar bases de datos primero
     wipe_existing_data()
-    wipe_influxdb_measurements()
+    if args.wipe_influx:
+        wipe_influxdb_measurements()
+    else:
+        info("Saltando borrado de InfluxDB (no se solicitó --wipe-influx)")
 
     all_plot_ids = []
 
