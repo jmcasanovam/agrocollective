@@ -96,7 +96,7 @@ def upgrade() -> None:
     op.add_column('plots', sa.Column('crop_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('plots', sa.Column('soil_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('plots', sa.Column('hash_plot', sa.String(64), nullable=True))
-    op.add_column('plots', sa.Column('management_profile', sa.String(20), nullable=True))
+    op.add_column('plots', sa.Column('management_profile', sa.String(150), nullable=True))
     op.create_foreign_key('fk_plots_crop_id', 'plots', 'crops', ['crop_id'], ['id'])
     op.create_foreign_key('fk_plots_soil_id', 'plots', 'soils', ['soil_id'], ['id'])
     op.drop_column('plots', 'crop_type')

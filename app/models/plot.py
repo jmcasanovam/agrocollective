@@ -18,7 +18,7 @@ class Plot(Base, BaseModelMixin):
     name: Mapped[str | None] = mapped_column(String(150))
     area_ha: Mapped[float | None] = mapped_column(Float)
     hash_plot: Mapped[str | None] = mapped_column(String(64))
-    management_profile: Mapped[str | None] = mapped_column(String(20))
+    management_profile: Mapped[str | None] = mapped_column(String(150))
 
     farm = relationship("Farm", back_populates="plots")
     crop = relationship("Crop", back_populates="plots")
