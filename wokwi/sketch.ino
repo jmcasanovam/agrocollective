@@ -122,7 +122,7 @@ Parcela fleet[FLEET_SIZE] = {
 // ── Tiempo simulado ───────────────────────────────────────────────────────────
 // 2025-05-01 00:00:00 UTC = 1746057600
 unsigned long simEpoch    = 1746057600UL;
-const unsigned long SIM_STEP = 10800UL;   // segundos simulados por publicación (3h)
+const unsigned long SIM_STEP = 900UL;   // segundos simulados por publicación (15 min)
 
 unsigned long lastSample = 0;
 
@@ -244,6 +244,11 @@ void sampleSensors() {
 void publishFleet(float avgAirTemp, float avgSoilTemp, float avgRelHum, float avgSoilHum) {
   String ts = epochToISO8601(simEpoch);
 
+  static unsigned long lastSimDay = 0;
+  unsigned long currentSimDay = simEpoch / 86400;
+  bool dayChanged = (lastSimDay != 0 && currentSimDay != lastSimDay);
+  lastSimDay = currentSimDay;
+
   for (int i = 0; i < FLEET_SIZE; i++) {
     Parcela& p = fleet[i];
 
@@ -261,9 +266,14 @@ void publishFleet(float avgAirTemp, float avgSoilTemp, float avgRelHum, float av
     if (isnan(relHum))   relHum   = 62.0f - delta * 0.8f;
     if (isnan(soilHum))  soilHum  = constrain(45.0f + i * 1.5f, 0.0f, 100.0f);
 
-    // Batería: descarga lenta
-    p.battery_mv -= (float)random(0, 4) / 10.0f;
-    if (p.battery_mv < 3300.0f) p.battery_mv = 3300.0f;
+    // Batería: quitar un % cada día (10% de 900mV = 90mV). Si llega al 10% (3390 mV), aviso y vuelve a 100% (4200 mV)
+    if (dayChanged) {
+      p.battery_mv -= 90.0f;
+      if (p.battery_mv <= 3390.0f) {
+        Serial.printf("[AVISO] Bateria del dispositivo %s al 10%% (%d mV). Restableciendo a 100%%.\n", p.esp32_id, (int)p.battery_mv);
+        p.battery_mv = 4200.0f;
+      }
+    }
 
     char topic[80];
     snprintf(topic, sizeof(topic),
