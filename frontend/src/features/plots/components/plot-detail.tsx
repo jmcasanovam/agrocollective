@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePlot } from "../api/get-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
+import { PlotWeatherCard } from "./plot-weather-card";
 interface PlotDetailProps {
   farmId: string | null;
   plotId: string;
@@ -111,6 +112,9 @@ export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
 
         {/* Right Column: Placeholders for flows 4-6 */}
         <div className="md:col-span-2 space-y-6">
+          {/* SiAR Climate Records */}
+          <PlotWeatherCard plotId={plotId} />
+
           {/* Readings Card Placeholder */}
           <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 opacity-60 flex flex-col justify-between h-[180px]">
             <div>
