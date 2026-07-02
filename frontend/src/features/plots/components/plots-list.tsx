@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePlots } from "../api/get-plots";
 import { PlotCard } from "./plot-card";
 import { PlotFormModal } from "./plot-form-modal";
+
 interface PlotsListProps {
   selectedFarm?: { id: string; name: string } | null;
 }
@@ -26,7 +27,7 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
   if (isLoading) {
     return (
       <div className="p-8 text-center">
-        <div className="w-6 h-6 rounded-full border-3 border-[#2f5d3f] border-t-transparent animate-spin mx-auto mb-2" />
+        <div className="w-6 h-6 rounded-full border-[3px] border-[#2f5d3f] border-t-transparent animate-spin mx-auto mb-2" />
         <p className="text-xs text-[#6b7a70]">Cargando parcelas...</p>
       </div>
     );
@@ -41,25 +42,28 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="max-w-[1120px] mx-auto space-y-5">
+      {/* Header */}
+      <div className="flex items-end justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#24302a]">Parcelas</h2>
-          <p className="text-xs text-[#6b7a70]">
-            Sectores e hidrantes bajo gestión en {selectedFarm.name}
+          <h1 className="text-2xl font-bold text-[#24302a] tracking-tight m-0 mb-1">
+            Parcelas de {selectedFarm.name}
+          </h1>
+          <p className="text-sm text-[#6b7a70] m-0">
+            Cada parcela tiene un nodo ESP32 y su propio análisis agronómico.
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="h-10 px-4 border-none rounded-lg bg-[#2f5d3f] text-white text-xs font-semibold cursor-pointer hover:bg-[#264b33] transition-colors flex items-center gap-1.5"
+          className="h-10 px-4 border-none rounded-[9px] bg-[#2f5d3f] text-white text-sm font-semibold cursor-pointer hover:bg-[#264b33] transition-colors inline-flex items-center gap-2"
         >
           <svg
-            width="15"
-            height="15"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
+            stroke="#fff"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -70,6 +74,7 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
         </button>
       </div>
 
+      {/* Plot cards */}
       {!plots || plots.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[#d9d3c5]/60 text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-[#f4f2eb] flex items-center justify-center text-[#6b7a70]">
@@ -83,10 +88,8 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <rect width="7" height="9" x="3" y="3" rx="1" />
-              <rect width="7" height="5" x="14" y="3" rx="1" />
-              <rect width="7" height="9" x="14" y="12" rx="1" />
-              <rect width="7" height="5" x="3" y="16" rx="1" />
+              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+              <path d="M2 21c0-3 1.85-5.36 5.08-6" />
             </svg>
           </div>
           <div>
@@ -103,31 +106,16 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#d9d3c5]/60 overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-[#fcfcfa] border-b border-[#d9d3c5]/60 text-[#6b7a70] text-[10px] font-bold tracking-wider uppercase">
-                  <th className="py-3.5 px-4">Nombre</th>
-                  <th className="py-3.5 px-4">Cultivo</th>
-                  <th className="py-3.5 px-4">Perfil</th>
-                  <th className="py-3.5 px-4">Superficie</th>
-                  <th className="py-3.5 px-4">Dispositivo IoT</th>
-                  <th className="py-3.5 px-4 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#f0ede6]">
-                {plots.map((plot) => (
-                  <PlotCard key={plot.id} plot={plot} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="flex flex-col gap-3.5">
+          {plots.map((plot) => (
+            <PlotCard key={plot.id} plot={plot} />
+          ))}
         </div>
       )}
 
       <PlotFormModal
         farmId={selectedFarm.id}
+        farmName={selectedFarm.name}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />

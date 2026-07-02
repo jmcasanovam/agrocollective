@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FarmCard } from "./farm-card";
 import { FarmFormModal } from "./farm-form-modal";
 import { useFarmStore } from "../stores/farm";
@@ -13,6 +14,12 @@ interface FarmGridProps {
 export function FarmGrid({ farms }: FarmGridProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const selectFarm = useFarmStore((state) => state.selectFarm);
+  const router = useRouter();
+
+  const handleSelectFarm = (farm: Farm) => {
+    selectFarm(farm);
+    router.push("/");
+  };
 
   return (
     <div className="space-y-6">
@@ -77,7 +84,7 @@ export function FarmGrid({ farms }: FarmGridProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {farms.map((farm) => (
-            <FarmCard key={farm.id} farm={farm} onClick={() => selectFarm(farm)} />
+            <FarmCard key={farm.id} farm={farm} onClick={() => handleSelectFarm(farm)} />
           ))}
         </div>
       )}

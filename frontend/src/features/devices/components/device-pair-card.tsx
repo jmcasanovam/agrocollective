@@ -41,61 +41,94 @@ export function DevicePairCard({ plotId }: DevicePairCardProps) {
   };
 
   return (
-    <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-lg bg-[#f4f2eb] flex items-center justify-center text-[#6b7a70]">
+    <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#2f5d3f"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <path d="M15 2v2" />
+          <path d="M15 20v2" />
+          <path d="M2 15h2" />
+          <path d="M2 9h2" />
+          <path d="M20 15h2" />
+          <path d="M20 9h2" />
+          <path d="M9 2v2" />
+          <path d="M9 20v2" />
+        </svg>
+        <h3 className="text-[15px] font-bold text-[#24302a] m-0">Dispositivo IoT</h3>
+      </div>
+
+      {/* Empty state */}
+      <div className="text-center py-2.5 px-1">
+        <div className="w-[46px] h-[46px] rounded-xl bg-[#f2efe6] flex items-center justify-center mx-auto mb-3">
           <svg
-            width="18"
-            height="18"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
+            stroke="#a3aca2"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            <path d="M2 2l20 20" />
+            <rect x="4" y="4" width="16" height="16" rx="2" />
           </svg>
         </div>
-        <h3 className="text-md font-bold text-[#24302a]">Dispositivo IoT</h3>
-      </div>
+        <div className="text-sm font-semibold text-[#3a4a42] mb-1">Sin dispositivo</div>
+        <p className="text-xs text-[#8a978d] leading-relaxed m-0 mb-3.5">
+          Esta parcela aún no tiene un nodo ESP32 emparejado.
+        </p>
 
-      <p className="text-xs text-[#6b7a70] mb-5 leading-relaxed">
-        No hay ningún dispositivo IoT emparejado a esta parcela. Introduce el código identificador
-        para empezar a recibir lecturas de humedad y temperatura en tiempo real.
-      </p>
+        {createDeviceMutation.isError && (
+          <div className="mb-3.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600 text-left">
+            El dispositivo no existe o ya está emparejado a otra parcela.
+          </div>
+        )}
 
-      {createDeviceMutation.isError && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
-          El dispositivo no existe o ya está emparejado a otra parcela.
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-[#3a4a42] mb-1.5">
-            Código del dispositivo
-          </label>
-          <div className="flex gap-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <div>
             <input
               type="text"
-              placeholder="Ej. AGRO-P00-001"
+              placeholder="Código, ej. AGRO-P00-001"
               disabled={createDeviceMutation.isPending}
               {...register("code")}
-              className="flex-1 h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40 disabled:opacity-60"
+              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 disabled:opacity-60 font-[inherit]"
             />
-            <button
-              type="submit"
-              disabled={createDeviceMutation.isPending}
-              className="h-10 px-4 border-none rounded-lg bg-[#2f5d3f] text-white text-xs font-semibold cursor-pointer hover:bg-[#264b33] disabled:opacity-60"
-            >
-              {createDeviceMutation.isPending ? "Vinculando..." : "Vincular"}
-            </button>
+            {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
           </div>
-          {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
-        </div>
-      </form>
+          <button
+            type="submit"
+            disabled={createDeviceMutation.isPending}
+            className="h-[38px] px-4 border-none rounded-[9px] bg-[#2f5d3f] text-white text-[13.5px] font-semibold cursor-pointer hover:bg-[#264b33] disabled:opacity-60 inline-flex items-center gap-[7px] font-[inherit]"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="M12 5v14" />
+            </svg>
+            {createDeviceMutation.isPending ? "Vinculando..." : "Emparejar dispositivo"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

@@ -26,134 +26,135 @@ export function DeviceStatusCard({ plotId, device }: DeviceStatusCardProps) {
     if (window.confirm("¿Seguro que deseas desvincular este dispositivo?")) {
       setIsUnpairing(true);
       deleteDeviceMutation.mutate(device.id, {
-        onSuccess: () => {
-          setIsUnpairing(false);
-        },
-        onError: () => {
-          setIsUnpairing(false);
-        },
+        onSettled: () => setIsUnpairing(false),
       });
     }
   };
 
-  // Battery percentage computation (3300mV to 4200mV)
+  // Battery percentage (3300mV = 0%, 4200mV = 100%)
   const batteryMv = device.battery_mv ?? 0;
   const batteryPct = Math.min(100, Math.max(0, Math.round(((batteryMv - 3300) / 900) * 100)));
+  const batteryColor = batteryPct > 60 ? "#4f8a5b" : batteryPct > 35 ? "#d98a2b" : "#d24b43";
 
-  const batteryVolts = (batteryMv / 1000).toFixed(2);
-
-  // Connection status (Online if last_seen_at exists and is active)
+  // Connection status
   const isOnline = device.is_active && !!device.last_seen_at;
 
   const formattedLastSeen = device.last_seen_at
-    ? new Date(device.last_seen_at).toLocaleTimeString("es-ES", {
+    ? new Date(device.last_seen_at).toLocaleString("es-ES", {
+        day: "numeric",
+        month: "short",
         hour: "2-digit",
         minute: "2-digit",
       })
     : "Nunca";
 
   return (
-    <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 space-y-5">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[#2f5d3f]/10 flex items-center justify-center text-[#2f5d3f]">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-              <path d="M12 18h.01" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-[#24302a]">Dispositivo IoT</h3>
-            <p className="text-[10px] text-[#6b7a70]">{device.code}</p>
-          </div>
-        </div>
+    <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#2f5d3f"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <path d="M15 2v2" />
+          <path d="M15 20v2" />
+          <path d="M2 15h2" />
+          <path d="M2 9h2" />
+          <path d="M20 15h2" />
+          <path d="M20 9h2" />
+          <path d="M9 2v2" />
+          <path d="M9 20v2" />
+        </svg>
+        <h3 className="text-[15px] font-bold text-[#24302a] m-0">Dispositivo IoT</h3>
+      </div>
 
+      {/* Device info row */}
+      <div className="flex items-center justify-between mb-3.5">
+        <div>
+          <div className="text-sm font-bold font-mono text-[#24302a]">{device.code}</div>
+          <div className="text-xs text-[#8a978d]">Nodo ESP32</div>
+        </div>
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-            isOnline
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-gray-100 text-gray-500 border border-gray-200"
+          className={`text-[11.5px] font-semibold px-[11px] py-1 rounded-full ${
+            isOnline ? "bg-[#e3efdd] text-[#356440]" : "bg-[#f8e5e2] text-[#b23a33]"
           }`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`}
-          />
-          {isOnline ? "Conectado" : "Offline"}
+          {isOnline ? "En línea" : "Offline"}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 py-1 border-t border-b border-[#f0ede6]">
+      {/* Battery */}
+      <div className="space-y-2.5">
         <div>
-          <div className="text-[10px] text-[#6b7a70] uppercase tracking-wider font-bold">
-            Batería
-          </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-sm font-bold text-[#24302a]">
-              {batteryMv > 0 ? `${batteryPct}%` : "No disp."}
-            </span>
-            <span className="text-[10px] text-[#6b7a70]">
-              {batteryMv > 0 ? `(${batteryVolts}V)` : ""}
+          <div className="flex justify-between text-xs mb-1.5">
+            <span className="text-[#6b7a70]">Batería</span>
+            <span className="font-semibold text-[#3a4a42]">
+              {batteryMv > 0 ? `${batteryPct}% · ${batteryMv} mV` : "No disponible"}
             </span>
           </div>
           {batteryMv > 0 && (
-            <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+            <div className="h-2 bg-[#eef0ea] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${
-                  batteryPct > 50 ? "bg-green-500" : batteryPct > 20 ? "bg-amber-500" : "bg-red-500"
-                }`}
-                style={{ width: `${batteryPct}%` }}
+                className="h-full rounded-full transition-all"
+                style={{ width: `${batteryPct}%`, backgroundColor: batteryColor }}
               />
             </div>
           )}
         </div>
 
-        <div>
-          <div className="text-[10px] text-[#6b7a70] uppercase tracking-wider font-bold">
-            Última Señal
-          </div>
-          <div className="text-sm font-bold text-[#24302a] mt-1">{formattedLastSeen}</div>
-          <div className="text-[10px] text-[#6b7a70] mt-1.5">
-            Topic: <span className="font-mono text-[9px]">devices/{device.code}/readings</span>
-          </div>
+        {/* Last seen */}
+        <div className="flex justify-between text-xs pt-1.5 border-t border-[#f0ece2]">
+          <span className="text-[#6b7a70]">Última señal</span>
+          <span className="font-semibold text-[#3a4a42]">{formattedLastSeen}</span>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleToggleActive}
-            disabled={updateDeviceMutation.isPending}
-            className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none ${
-              device.is_active ? "bg-[#2f5d3f]" : "bg-gray-300"
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                device.is_active ? "translate-x-4" : "translate-x-0"
-              }`}
-            />
-          </button>
-          <span className="text-xs font-semibold text-[#3a4a42]">
-            {device.is_active ? "Dispositivo habilitado" : "Dispositivo deshabilitado"}
+        {/* MQTT Topic */}
+        <div className="flex justify-between text-xs">
+          <span className="text-[#6b7a70]">Topic MQTT · QoS 1</span>
+          <span className="font-semibold text-[#3a4a42] font-mono text-[11px]">
+            devices/{device.code}/readings
           </span>
         </div>
 
-        <button
-          onClick={handleUnpair}
-          disabled={isUnpairing}
-          className="text-xs text-red-600 font-bold bg-transparent border-none cursor-pointer hover:underline disabled:opacity-50"
-        >
-          Desvincular nodo
-        </button>
+        {/* Toggle is_active */}
+        <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-[#f0ece2]">
+          <div>
+            <div className="text-[13px] font-semibold text-[#3a4a42]">Habilitado</div>
+            <div className="text-[11.5px] text-[#9aa79d]">acepta lecturas del nodo</div>
+          </div>
+          <button
+            onClick={handleToggleActive}
+            disabled={updateDeviceMutation.isPending}
+            className={`w-11 h-6 rounded-full relative cursor-pointer border-none transition-colors ${
+              device.is_active ? "bg-[#4f8a5b]" : "bg-[#c3ccbf]"
+            }`}
+          >
+            <div
+              className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-[left] ${
+                device.is_active ? "left-[22px]" : "left-[2px]"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Unpair */}
+        <div className="pt-2 text-right">
+          <button
+            onClick={handleUnpair}
+            disabled={isUnpairing}
+            className="text-xs text-[#8a5b52] font-semibold bg-transparent border-none cursor-pointer hover:underline disabled:opacity-50"
+          >
+            Desvincular nodo
+          </button>
+        </div>
       </div>
     </div>
   );

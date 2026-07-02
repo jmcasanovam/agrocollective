@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/incompatible-library */
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -7,7 +8,7 @@ import { useCreatePlot } from "../api/create-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
 
 const plotSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z.string().optional(),
   crop_id: z.string().min(1, "El cultivo es obligatorio"),
   soil_id: z.string().min(1, "El tipo de suelo es obligatorio"),
   area_ha: z.string().optional(),
@@ -18,11 +19,12 @@ type PlotFormInput = z.infer<typeof plotSchema>;
 
 interface PlotFormModalProps {
   farmId: string | null;
+  farmName?: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
+export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormModalProps) {
   const createPlotMutation = useCreatePlot(farmId);
   const { data: crops } = useCrops();
   const { data: soils } = useSoils();
@@ -32,6 +34,7 @@ export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<PlotFormInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(plotSchema as any),
@@ -42,12 +45,18 @@ export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
       area_ha: "",
       management_profile: "Riego deficitario controlado",
     },
+    mode: "onChange",
   });
 
+  const cropValue = watch("crop_id");
+  const soilValue = watch("soil_id");
+  const canSubmit = !!(cropValue && soilValue);
+
   const onSubmit = (data: PlotFormInput) => {
+    if (!canSubmit) return;
     createPlotMutation.mutate(
       {
-        name: data.name,
+        name: data.name || "Nueva parcela",
         crop_id: data.crop_id,
         soil_id: data.soil_id,
         area_ha: data.area_ha ? Number(data.area_ha) : null,
@@ -65,40 +74,58 @@ export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-[#d9d3c5]/60 animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex justify-between items-center mb-5">
-          <h3 className="text-lg font-bold text-[#24302a]">Nueva Parcela</h3>
-          <button
-            onClick={onClose}
-            className="text-[#6b7a70] hover:text-[#24302a] cursor-pointer bg-transparent border-none text-xl"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(22,34,26,0.45)] p-6">
+      <div className="relative w-[460px] max-w-[92vw] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.22)] p-[26px]">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-[18px] right-[18px] w-[30px] h-[30px] rounded-lg flex items-center justify-center cursor-pointer bg-transparent border-none text-[#8a978d] hover:bg-[#f0ede4] hover:text-[#3a4a42] transition-colors"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            &times;
-          </button>
-        </div>
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+
+        <h2 className="text-[19px] font-bold text-[#24302a] m-0 mb-1">Nueva parcela</h2>
+        <p className="text-[13px] text-[#8a978d] m-0 mb-5">
+          Añade una parcela a {farmName || "tu finca"}.
+        </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Name (optional) */}
           <div>
-            <label className="block text-xs font-semibold text-[#3a4a42] mb-1">
-              Nombre de la parcela
+            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+              Nombre <span className="text-[#9aa79d] font-normal">(opcional)</span>
             </label>
             <input
               type="text"
-              placeholder="Ej. Sector 1 Olivos"
+              placeholder="Parcela Oeste"
               {...register("name")}
-              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40"
+              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
             />
-            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Crop + Soil (both required) */}
+          <div className="grid grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-semibold text-[#3a4a42] mb-1">Cultivo</label>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Cultivo <span className="text-[#c0453d]">*</span>
+              </label>
               <select
                 {...register("crop_id")}
-                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2 text-sm outline-none focus:ring-2 focus:ring-[#2f5d3f]/40"
+                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
               >
-                <option value="">Selecciona cultivo</option>
+                <option value="">Selecciona cultivo…</option>
                 {crops?.map((crop) => (
                   <option key={crop.id} value={crop.id}>
                     {crop.name}
@@ -109,16 +136,15 @@ export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
                 <p className="mt-1 text-xs text-red-500">{errors.crop_id.message}</p>
               )}
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-[#3a4a42] mb-1">
-                Tipo de suelo
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Tipo de suelo <span className="text-[#c0453d]">*</span>
               </label>
               <select
                 {...register("soil_id")}
-                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2 text-sm outline-none focus:ring-2 focus:ring-[#2f5d3f]/40"
+                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
               >
-                <option value="">Selecciona suelo</option>
+                <option value="">Selecciona suelo…</option>
                 {soils?.map((soil) => (
                   <option key={soil.id} value={soil.id}>
                     {soil.name}
@@ -131,49 +157,55 @@ export function PlotFormModal({ farmId, isOpen, onClose }: PlotFormModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#3a4a42] mb-1">
-                Superficie (ha)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                placeholder="Ej. 3.2"
-                {...register("area_ha")}
-                className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/40"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#3a4a42] mb-1">
-                Perfil de Gestión
-              </label>
-              <select
-                {...register("management_profile")}
-                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2 text-sm outline-none focus:ring-2 focus:ring-[#2f5d3f]/40"
-              >
-                <option value="Riego deficitario controlado">Deficitario controlado</option>
-                <option value="Estándar SiAR">Estándar SiAR</option>
-                <option value="Riego por goteo optimizado">Goteo optimizado</option>
-                <option value="Secano">Secano</option>
-              </select>
-            </div>
+          {/* Profile (optional) */}
+          <div>
+            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+              Perfil de gestión <span className="text-[#9aa79d] font-normal">(opcional)</span>
+            </label>
+            <select
+              {...register("management_profile")}
+              className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+            >
+              <option value="Riego deficitario controlado">Seco eficiente</option>
+              <option value="Estándar SiAR">Moderado</option>
+              <option value="Riego por goteo optimizado">Húmedo intensivo</option>
+              <option value="Secano">Secano</option>
+            </select>
           </div>
 
-          <div className="flex gap-3 justify-end mt-6">
+          {/* Area (optional) */}
+          <div>
+            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+              Superficie (ha) <span className="text-[#9aa79d] font-normal">(opcional)</span>
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="4.2"
+              {...register("area_ha")}
+              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2.5 justify-end pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 px-4 border border-[#d9d3c5] rounded-lg text-sm font-semibold text-[#3a4a42] bg-white cursor-pointer hover:bg-zinc-50"
+              className="h-[42px] px-[18px] border border-[#d9d3c5] bg-white rounded-[9px] text-sm font-semibold text-[#3a4a42] cursor-pointer hover:bg-[#f4f2ea] transition-colors font-[inherit]"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={createPlotMutation.isPending}
-              className="h-10 px-4 border-none rounded-lg bg-[#2f5d3f] text-white text-sm font-semibold cursor-pointer hover:bg-[#264b33] disabled:opacity-60"
+              disabled={!canSubmit || createPlotMutation.isPending}
+              className={`h-[42px] px-5 border-none rounded-[9px] text-sm font-semibold text-white font-[inherit] transition-colors ${
+                canSubmit
+                  ? "bg-[#2f5d3f] cursor-pointer hover:bg-[#264b33]"
+                  : "bg-[#c3ccbf] cursor-not-allowed"
+              }`}
             >
-              {createPlotMutation.isPending ? "Creando..." : "Crear Parcela"}
+              {createPlotMutation.isPending ? "Creando..." : "Crear parcela"}
             </button>
           </div>
         </form>
