@@ -38,7 +38,7 @@ load_dotenv()
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-N_PLOTS   = 10
+N_PLOTS   = 100
 DEVICE_PREFIX = "AGRO-P"
 SEND_DELAY_SECONDS = 0.02   # pausa entre mensajes en modo FAST
 
@@ -77,16 +77,8 @@ MM_TO_PCT  = 0.4  # mm → % (factor genérico; dry escala el lado de la ETo)
 # Fallback de perfil por índice cuando la BD no responde
 # (debe coincidir con MANAGEMENT_PROFILES de setup_simulation.py)
 PROFILE_FALLBACK = [
-    "seco_eficiente",   # P00
-    "moderado",         # P01
-    "moderado",         # P02
-    "seco_eficiente",   # P03
-    "humedo_intensivo", # P04
-    "moderado",         # P05
-    "seco_eficiente",   # P06
-    "humedo_intensivo", # P07
-    "moderado",         # P08
-    "humedo_intensivo", # P09
+    "seco_eficiente" if (i % 3 == 0) else "moderado" if (i % 3 == 1) else "humedo_intensivo"
+    for i in range(100)
 ]
 
 BATTERY_RANGE = (3400, 4100)
@@ -369,10 +361,25 @@ class SensorSimulator:
         eto    = w.get("eto", 3.0)
         precip = w.get("precipitation", 0.0)
         irrig  = IRRIG_MM.get(self.profile, 5.0)
+
+        # Inyectar fallos físicos en la simulación de riego (anomalías dinámicas)
+        if self.plot_index == 3:
+            # Parcela 3: Válvula cerrada/rota. Sin riego. Se seca dinámicamente con ETo.
+            irrig = 0.0
+        elif self.plot_index == 7:
+            # Parcela 7: Válvula atascada abierta. Riego masivo diario.
+            irrig = 30.0
+
         # STOCK: delta modifica el nivel previo; ETo escala por tipo de suelo
         delta  = (precip * 0.8 + irrig * 0.9 - eto * self._dry) * MM_TO_PCT
-        # Acotar entre WP y FC del suelo de la parcela (límites físicos)
-        self._sh = max(self._wp, min(self._fc, self._sh + delta))
+        
+        # Ajustar límites físicos de acumulación de agua según el tipo de anomalía
+        if self.plot_index == 3:
+            self._sh = max(self._wp - 5.0, min(self._fc, self._sh + delta))
+        elif self.plot_index == 7:
+            self._sh = max(self._wp, min(self._fc + 10.0, self._sh + delta))
+        else:
+            self._sh = max(self._wp, min(self._fc, self._sh + delta))
 
     def next_reading(self, ts: datetime, day_weather: dict) -> dict:
         day = ts.date()
@@ -408,9 +415,11 @@ class SensorSimulator:
         )
 
         # Humedad del suelo — oscilación intra-día sobre el nivel diario (STOCK)
-        # Acotada a [WP, FC] del suelo; los outliers se aplican DESPUÉS, fuera del rango
+        # Acotada al rango físico ajustado de la parcela
+        wp_limit = self._wp - 5.0 if self.plot_index == 3 else self._wp
+        fc_limit = self._fc + 10.0 if self.plot_index == 7 else self._fc
         soil_hum = round(
-            max(self._wp, min(self._fc, self._sh + random.gauss(0, 0.4))), 2
+            max(wp_limit, min(fc_limit, self._sh + random.gauss(0, 0.4))), 2
         )
 
         battery = int(random.uniform(*BATTERY_RANGE))
@@ -561,8 +570,9 @@ def main() -> None:
         print(f"  {code}  estacion={station}  perfil={profile}  "
               f"suelo={soil}  WP={sp['WP']}%  FC={sp['FC']}%")
 
-    days        = [START_DATE + timedelta(days=d)
+    all_days    = [START_DATE + timedelta(days=d)
                    for d in range((END_DATE - START_DATE).days + 1)]
+    days        = all_days[-45:]
     total_msgs  = len(days) * len(HOURS_PER_DAY) * N_PLOTS
 
     print(f"\n  Ventana:     {START_DATE} → {END_DATE}  ({len(days)} días)")

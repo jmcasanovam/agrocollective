@@ -23,9 +23,9 @@ from datetime import date, timedelta
 # =============================================================================
 
 API_BASE_URL  = "http://localhost:8000"
-USER_EMAIL    = "simulacion@agrocollective.com"
+USER_EMAILS   = [f"simulacion{i}@agrocollective.com" for i in range(5)]
 USER_PASSWORD = "Simul2026!"
-N_PLOTS       = 10
+N_PLOTS       = 100
 DEVICE_PREFIX = "AGRO-P"
 RANDOM_SEED   = 42
 
@@ -65,16 +65,8 @@ SOIL_IDS = [
 
 # Management profile por parcela (espejo de simulate_sensors.py PROFILE_DISTRIBUTION)
 MANAGEMENT_PROFILES = [
-    "seco_eficiente",   # P00 Valencia
-    "moderado",         # P01 Valencia
-    "moderado",         # P02 Valencia
-    "seco_eficiente",   # P03 Valencia
-    "humedo_intensivo", # P04 Valencia
-    "moderado",         # P05 Baza
-    "seco_eficiente",   # P06 Baza
-    "humedo_intensivo", # P07 Baza
-    "moderado",         # P08 Baza
-    "humedo_intensivo", # P09 Baza
+    "seco_eficiente" if (i % 3 == 0) else "moderado" if (i % 3 == 1) else "humedo_intensivo"
+    for i in range(100)
 ]
 
 # Riego por profile (freq veces/semana, mm/riego)
@@ -263,17 +255,17 @@ def get_soil_ids(client) -> list[str]:
 # PASO 1 — Usuario
 # =============================================================================
 
-def setup_user(client) -> str:
-    step("Creando / verificando usuario de simulacion")
-    r = api_post(client, "/auth/register", {"email": USER_EMAIL, "password": USER_PASSWORD})
+def setup_user_by_email(client, email: str) -> str:
+    step(f"Creando / verificando usuario: {email}")
+    r = api_post(client, "/auth/register", {"email": email, "password": USER_PASSWORD})
     if r.status_code in (200, 201):
-        ok(f"Usuario creado: {USER_EMAIL}")
+        ok(f"Usuario creado: {email}")
     elif r.status_code in (400, 409, 422):
         info("Usuario ya existe, haciendo login...")
     else:
         bail("Error al registrar usuario", r)
 
-    r = api_post(client, "/auth/login", {"email": USER_EMAIL, "password": USER_PASSWORD})
+    r = api_post(client, "/auth/login", {"email": email, "password": USER_PASSWORD})
     if r.status_code != 200:
         bail("Login fallido", r)
     token = r.json()["access_token"]
@@ -285,14 +277,14 @@ def setup_user(client) -> str:
 # PASO 2 — 2 Fincas con región
 # =============================================================================
 
-def setup_farms(client, region_ids: dict[str, str]) -> dict[str, str]:
+def setup_farms_dynamic(client, farms_def, region_ids: dict[str, str]) -> dict[str, str]:
     """Returns {farm_name: farm_id}."""
-    step("Creando / verificando 2 fincas con región asignada")
+    step("Creando / verificando fincas con región asignada")
     r = api_get(client, "/farms")
     existing = {f["name"]: f for f in (r.json() if r.status_code == 200 else [])}
 
     farm_ids = {}
-    for farm_def in FARMS_DEF:
+    for farm_def in farms_def:
         name  = farm_def["name"]
         rcode = farm_def["region_code"]
         rid   = region_ids[rcode]
@@ -320,19 +312,20 @@ def setup_farms(client, region_ids: dict[str, str]) -> dict[str, str]:
 # PASO 3 — Parcelas y dispositivos
 # =============================================================================
 
-def setup_plots(
+def setup_plots_dynamic(
     client,
+    farms_def,
     farm_ids: dict[str, str],
     crop_ids: list[str],
     soil_ids: list[str],
 ) -> list[str]:
-    """Returns plot_ids[0..9] indexed by plot index (None si falló)."""
-    step(f"Creando {N_PLOTS} parcelas (5 por finca) con management_profile y dispositivos")
+    """Returns plot_ids for this user."""
+    step(f"Creando parcelas con management_profile y dispositivos")
     random.seed(RANDOM_SEED)
 
-    plot_ids: list[str | None] = [None] * N_PLOTS
+    plot_ids: list[str] = []
 
-    for farm_def in FARMS_DEF:
+    for farm_def in farms_def:
         farm_id = farm_ids[farm_def["name"]]
         r = api_get(client, f"/farms/{farm_id}/plots")
         existing = {p["name"]: p for p in (r.json() if r.status_code == 200 else [])}
@@ -345,7 +338,7 @@ def setup_plots(
             if name in existing:
                 pid = existing[name]["id"]
                 info(f"Parcela {name} ya existe ({pid[:8]}...)")
-                plot_ids[i] = pid
+                plot_ids.append(pid)
                 continue
 
             crop_id = crop_ids[i % len(crop_ids)]
@@ -360,9 +353,9 @@ def setup_plots(
             if r.status_code not in (200, 201):
                 bail(f"Error creando parcela {name}", r)
             pid = r.json()["id"]
-            plot_ids[i] = pid
+            plot_ids.append(pid)
             ok(
-                f"Parcela {name}  finca={farm_def['name'][:14]}  "
+                f"Parcela {name}  finca={farm_def['name'][:20]}  "
                 f"perfil={profile}  ({pid[:8]}...)"
             )
 
@@ -464,15 +457,12 @@ def verify() -> None:
     step("Verificacion final")
     sql = (
          "SELECT "
-         "(SELECT count(*) FROM farms f "
-         "  JOIN regions r ON f.region_id=r.id) AS fincas_con_region, "
-         "(SELECT count(*) FROM plots "
-         "  WHERE management_profile IS NOT NULL) AS parcelas_con_perfil, "
-         "(SELECT count(*) FROM devices WHERE is_active=true) AS dispositivos, "
+         "(SELECT count(*) FROM farms) AS fincas, "
+         "(SELECT count(*) FROM plots) AS parcelas, "
+         "(SELECT count(*) FROM devices) AS dispositivos, "
          "(SELECT count(*) FROM irrigation_records) AS registros_riego, "
          "(SELECT count(*) FROM harvests) AS cosechas, "
-         "(SELECT string_agg(DISTINCT r.code, '/' ORDER BY r.code) "
-         "  FROM farms f JOIN regions r ON f.region_id=r.id) AS regiones;"
+         "(SELECT count(*) FROM users) AS usuarios;"
     )
     try:
         from app.database.postgres import SessionLocal
@@ -480,7 +470,7 @@ def verify() -> None:
         db = SessionLocal()
         try:
             res = db.execute(text(sql)).first()
-            print(f"  fincas_con_region: {res[0]}\n  parcelas_con_perfil: {res[1]}\n  dispositivos: {res[2]}\n  registros_riego: {res[3]}\n  cosechas: {res[4]}\n  regiones: {res[5]}")
+            print(f"  usuarios: {res[5]}\n  fincas: {res[0]}\n  parcelas: {res[1]}\n  dispositivos: {res[2]}\n  registros_riego: {res[3]}\n  cosechas: {res[4]}")
         finally:
             db.close()
     except Exception:
@@ -554,11 +544,13 @@ def main():
     header("AgroCollective — Setup de simulacion (Sprint 2)")
     info(f"API: {API_BASE_URL}")
     info(f"Rango de simulación: {SIM_START} → {SIM_END}")
-    info(f"Parcelas: {N_PLOTS}  (P00-P04 → Valencia, P05-P09 → Baza)")
+    info(f"Parcelas: {N_PLOTS}  (100 parcelas divididas entre 5 usuarios)")
 
     # 1. Limpiar bases de datos primero
     wipe_existing_data()
     wipe_influxdb_measurements()
+
+    all_plot_ids = []
 
     with httpx.Client(timeout=15) as client:
         # Resolve IDs via API inside Client context
@@ -568,11 +560,38 @@ def main():
         crop_ids = get_crop_ids(client)
         soil_ids = get_soil_ids(client)
 
-        setup_user(client)
-        farm_ids = setup_farms(client, region_ids)
-        plot_ids = setup_plots(client, farm_ids, crop_ids, soil_ids)
+        for u in range(5):
+            email = f"simulacion{u}@agrocollective.com"
+            # Limpiar header de auth previo para iniciar sesión como el nuevo usuario
+            if "Authorization" in client.headers:
+                del client.headers["Authorization"]
+            
+            setup_user_by_email(client, email)
 
-    setup_historical_data(plot_ids)
+            farms_def = [
+                {
+                    "name":         f"Finca Valencia {u}",
+                    "region_code":  "VALENCIA",
+                    "latitude":     39.36,
+                    "longitude":    -0.44,
+                    "area_ha":      25.0,
+                    "plot_indices": list(range(u * 20, u * 20 + 10)),
+                },
+                {
+                    "name":         f"Finca Baza {u}",
+                    "region_code":  "BAZA",
+                    "latitude":     37.49,
+                    "longitude":    -2.77,
+                    "area_ha":      25.0,
+                    "plot_indices": list(range(u * 20 + 10, u * 20 + 20)),
+                },
+            ]
+
+            farm_ids = setup_farms_dynamic(client, farms_def, region_ids)
+            plot_ids = setup_plots_dynamic(client, farms_def, farm_ids, crop_ids, soil_ids)
+            all_plot_ids.extend(plot_ids)
+
+    setup_historical_data(all_plot_ids)
     verify()
 
     header("Setup completado")
