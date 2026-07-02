@@ -32,7 +32,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }
     } else {
       if (pathname === "/login") {
-        router.push("/farms");
+        // After login, go to farm selection if no farm selected, else dashboard
+        router.push(selectedFarmId ? "/" : "/farms");
       } else if (!selectedFarmId && pathname !== "/farms") {
         router.push("/farms");
       }

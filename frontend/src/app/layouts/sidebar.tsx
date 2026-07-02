@@ -11,11 +11,11 @@ export function Sidebar() {
   const navItems = [
     {
       name: "Resumen",
-      href: "/plots", // Resumen points to /plots for now
+      href: "/",
       icon: (
         <svg
-          width="18"
-          height="18"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -29,6 +29,7 @@ export function Sidebar() {
           <rect width="7" height="5" x="3" y="16" rx="1" />
         </svg>
       ),
+      match: (p: string) => p === "/",
       disabled: false,
     },
     {
@@ -36,8 +37,8 @@ export function Sidebar() {
       href: "/plots",
       icon: (
         <svg
-          width="18"
-          height="18"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -45,9 +46,11 @@ export function Sidebar() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="M3 3v18h18" />
+          <path d="m7 12 3-3 3 3 5-5" />
         </svg>
       ),
+      match: (p: string) => p === "/plots" || p.startsWith("/plots/"),
       disabled: false,
     },
     {
@@ -55,8 +58,8 @@ export function Sidebar() {
       href: "/farms",
       icon: (
         <svg
-          width="18"
-          height="18"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -64,10 +67,12 @@ export function Sidebar() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
+          <path d="M18 20V10" />
+          <path d="M12 20V4" />
+          <path d="M6 20v-6" />
         </svg>
       ),
+      match: (p: string) => p === "/farms",
       disabled: false,
     },
     {
@@ -75,8 +80,8 @@ export function Sidebar() {
       href: "#",
       icon: (
         <svg
-          width="18"
-          height="18"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -84,11 +89,11 @@ export function Sidebar() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
+          <path d="m12 14 4-4" />
+          <path d="M3.34 19a10 10 0 1 1 17.32 0" />
         </svg>
       ),
+      match: () => false,
       disabled: true,
     },
     {
@@ -96,8 +101,8 @@ export function Sidebar() {
       href: "#",
       icon: (
         <svg
-          width="18"
-          height="18"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -109,91 +114,84 @@ export function Sidebar() {
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
       ),
+      match: () => false,
       disabled: true,
     },
   ];
 
   return (
-    <aside className="w-64 bg-[#22402e] text-[#eef3ea] flex flex-col justify-between p-6 shrink-0 font-sans">
-      <div className="space-y-8">
-        {/* Brand logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#4f8a5b] flex items-center justify-center">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#fff"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-sm font-bold tracking-tight">AgroCollective</div>
-            <div className="text-[9px] tracking-widest uppercase text-[#9bc0a4]">
-              Gestión del agua
-            </div>
-          </div>
+    <aside className="w-[236px] shrink-0 bg-[#f4f2ea] border-r border-[#e3ddce] flex flex-col py-5 px-3.5 sticky top-0 h-screen font-sans">
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 px-2 pb-5">
+        <div className="w-[34px] h-[34px] rounded-[10px] bg-[#2f5d3f] flex items-center justify-center">
+          <svg
+            width="19"
+            height="19"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+            <path d="M2 21c0-3 1.85-5.36 5.08-6" />
+          </svg>
         </div>
-
-        {/* Navigation list */}
-        <nav className="space-y-1.5">
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href || (item.href !== "/plots" && pathname.startsWith(item.href));
-            if (item.disabled) {
-              return (
-                <div
-                  key={item.name}
-                  className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-[#567a61] cursor-not-allowed select-none"
-                >
-                  {item.icon}
-                  <span>{item.name}</span>
-                </div>
-              );
-            }
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  isActive
-                    ? "bg-[#4f8a5b]/20 text-white"
-                    : "text-[#c4d8ca] hover:bg-[#4f8a5b]/10 hover:text-white"
-                }`}
-              >
-                {item.icon}
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="text-[15px] font-bold tracking-tight text-[#24302a]">AgroCollective</div>
       </div>
 
-      <div className="space-y-6">
-        {/* Pipeline countdown block */}
-        <div className="p-4 bg-[#183022] rounded-xl border border-[#2b4c37]">
-          <div className="text-[9px] uppercase tracking-wider text-[#7fa389] font-bold">
-            Próximo cálculo
+      {/* Navigation */}
+      <nav className="flex flex-col gap-[3px]">
+        {navItems.map((item) => {
+          const isActive = item.match(pathname);
+
+          if (item.disabled) {
+            return (
+              <div
+                key={item.name}
+                className="flex items-center gap-[11px] px-3 py-[9px] rounded-[9px] text-sm font-medium text-[#5c6b62] cursor-not-allowed select-none"
+              >
+                {item.icon}
+                {item.name}
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={`flex items-center gap-[11px] px-3 py-[9px] rounded-[9px] text-sm font-medium transition-colors no-underline ${
+                isActive ? "bg-[#dbe8d3] text-[#2f5d3f]" : "text-[#5c6b62] hover:bg-[#e9e5da]"
+              }`}
+            >
+              {item.icon}
+              {item.name}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Spacer */}
+      <div className="mt-auto flex flex-col gap-3">
+        {/* Pipeline info */}
+        <div className="bg-[#eef3ea] border border-[#d8e4d3] rounded-xl p-3.5">
+          <div className="text-[11px] tracking-[0.1em] uppercase text-[#6b8a72] mb-1">
+            Próximo pipeline
           </div>
-          <div className="text-xs font-semibold text-white mt-1 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Hoy · 02:00 UTC
-          </div>
+          <div className="text-[13px] font-semibold text-[#2f5d3f]">Hoy · 02:00 UTC</div>
+          <div className="text-[11px] text-[#7d8c82] mt-0.5">análisis nocturno de parcelas</div>
         </div>
 
-        {/* Logout button */}
+        {/* Logout */}
         <button
           onClick={logout}
-          className="w-full h-9 border border-[#4f8a5b]/30 rounded-lg text-xs font-semibold text-[#c4d8ca] hover:text-white hover:bg-[#4f8a5b]/10 hover:border-white/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+          className="flex items-center gap-2.5 px-3 py-[9px] rounded-[9px] text-sm text-[#8a5b52] cursor-pointer bg-transparent border-none font-sans hover:bg-[#f3e8e5] transition-colors"
         >
           <svg
-            width="14"
-            height="14"
+            width="17"
+            height="17"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -203,7 +201,7 @@ export function Sidebar() {
           >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+            <line x1="21" x2="9" y1="12" y2="12" />
           </svg>
           Cerrar sesión
         </button>

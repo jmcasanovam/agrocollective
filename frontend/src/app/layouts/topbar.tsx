@@ -1,62 +1,46 @@
 "use client";
 
+import Link from "next/link";
 import { useFarmStore } from "@/features/farms/stores/farm";
 import { useRegions } from "@/features/farms/api/get-regions";
 import { useAuthStore } from "@/features/auth/stores/auth";
 
 export function Topbar() {
   const selectedFarm = useFarmStore((state) => state.selectedFarm);
-  const clearSelectedFarm = useFarmStore((state) => state.clearSelectedFarm);
   const { data: regions } = useRegions();
   const user = useAuthStore((state) => state.user);
 
   const region = regions?.find((r) => r.id === selectedFarm?.region_id);
-
-  // User initials
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
-    <header className="h-16 bg-white border-b border-[#d9d3c5]/60 flex items-center justify-between px-8 font-sans">
-      <div className="flex items-center gap-4">
+    <header className="h-[62px] shrink-0 bg-[#fbfaf6] border-b border-[#e3ddce] flex items-center px-[26px] gap-[18px] sticky top-0 z-20 font-sans">
+      {/* Farm info */}
+      <div className="min-w-0">
         {selectedFarm ? (
           <>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-[#24302a]">{selectedFarm.name}</span>
-                <span className="text-[10px] text-[#6b7a70] bg-[#f4f2eb] px-1.5 py-0.5 rounded-sm">
-                  {region ? `${region.name} (${region.code})` : "Sin región"}
-                </span>
-                {selectedFarm.area_ha && (
-                  <span className="text-[10px] text-[#6b7a70] bg-[#f4f2eb] px-1.5 py-0.5 rounded-sm">
-                    {selectedFarm.area_ha} ha
-                  </span>
-                )}
-              </div>
+            <div className="text-[15px] font-bold text-[#24302a] tracking-tight leading-tight">
+              {selectedFarm.name}
             </div>
-            <button
-              onClick={clearSelectedFarm}
-              className="h-7 px-2.5 border border-[#d9d3c5] rounded-md text-[10px] font-bold text-[#3a4a42] bg-white cursor-pointer hover:bg-zinc-50 transition-colors"
-            >
-              Cambiar finca
-            </button>
+            <div className="text-xs text-[#7d8c82]">
+              {region ? `${region.name} (${region.code})` : "Sin región"} ·{" "}
+              {selectedFarm.area_ha ? `${selectedFarm.area_ha} ha` : "—"}
+            </div>
           </>
         ) : (
-          <span className="text-sm font-bold text-[#6b7a70]">Ninguna finca seleccionada</span>
+          <div className="text-[15px] font-bold text-[#7d8c82]">Ninguna finca seleccionada</div>
         )}
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* System Active Badging */}
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#edf5ef] text-[#2f5d3f]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#4ab46b]" />
-          Sistema Operativo
-        </span>
-
-        {/* Notification Icon */}
-        <button className="p-1.5 text-[#6b7a70] hover:text-[#24302a] bg-transparent border-none cursor-pointer relative">
+      {/* Change farm button */}
+      {selectedFarm && (
+        <Link
+          href="/farms"
+          className="ml-2 h-8 px-3.5 border border-[#d9d3c5] bg-white rounded-lg text-[13px] font-medium text-[#3a4a42] no-underline inline-flex items-center gap-1.5 hover:bg-[#f4f2ea] transition-colors"
+        >
           <svg
-            width="18"
-            height="18"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -64,14 +48,40 @@ export function Topbar() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
           </svg>
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-500 border border-white" />
+          Cambiar finca
+        </Link>
+      )}
+
+      {/* Right side */}
+      <div className="ml-auto flex items-center gap-3.5">
+        {/* System status badge */}
+        <div className="inline-flex items-center gap-[7px] h-[30px] px-3 bg-[#e3efdd] rounded-full text-xs font-semibold text-[#35663f]">
+          <span className="w-[7px] h-[7px] rounded-full bg-[#3d9a52] inline-block" />
+          Sistema operativo
+        </div>
+
+        {/* Notification bell */}
+        <button className="relative w-[34px] h-[34px] rounded-[9px] flex items-center justify-center cursor-pointer bg-transparent border-none hover:bg-[#f0ede4] transition-colors">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#4a5a51"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+            <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+          </svg>
+          <span className="absolute top-[6px] right-[7px] w-[7px] h-[7px] bg-[#d24b43] rounded-full border-[1.5px] border-[#fbfaf6]" />
         </button>
 
-        {/* User initials Avatar */}
-        <div className="w-8 h-8 rounded-full bg-[#4f8a5b] text-white flex items-center justify-center text-xs font-bold shadow-xs">
+        {/* User avatar */}
+        <div className="w-[34px] h-[34px] rounded-full bg-[#cbdcc4] text-[#2f5d3f] flex items-center justify-center text-[13px] font-bold">
           {initials}
         </div>
       </div>
