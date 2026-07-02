@@ -34,10 +34,13 @@ RUN pnpm build
 # ── final: imagen mínima de producción ───────────────────────────────────────
 FROM node:22-alpine AS final
 
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PNPM_CONFIG_STORE_DIR=/tmp/pnpm-store
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
@@ -54,4 +57,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "if [ \"$APP_ENV\" = \"development\" ]; then pnpm dev; else node server.js; fi"]

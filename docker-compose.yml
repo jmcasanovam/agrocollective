@@ -12,8 +12,17 @@ services:
     ports:
       - "3000:3000"
 
+    env_file:
+      - .env
+
     environment:
-      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-production}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+
+    user: "1000:1000"
+
+    volumes:
+      - ./frontend:/app
 
     depends_on:
       - backend
