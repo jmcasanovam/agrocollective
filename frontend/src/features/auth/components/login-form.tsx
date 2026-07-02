@@ -9,12 +9,17 @@ import { useRouter } from "next/navigation";
 import { useLogin } from "../api/login";
 import { useRegister } from "../api/register";
 
-const authSchema = z.object({
+const loginSchema = z.object({
+  email: z.string().email("Debe introducir un correo electrónico válido"),
+  password: z.string().min(1, "La contraseña es requerida"),
+});
+
+const registerSchema = z.object({
   email: z.string().email("Debe introducir un correo electrónico válido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
-type AuthFormData = z.infer<typeof authSchema>;
+type AuthFormData = z.infer<typeof registerSchema>;
 
 export function LoginForm() {
   const [isLoginView, setIsLoginView] = useState(true);
@@ -30,8 +35,10 @@ export function LoginForm() {
     formState: { errors },
     reset,
   } = useForm<AuthFormData>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(authSchema as any),
+    resolver: (data, context, options) => {
+      const schema = isLoginView ? loginSchema : registerSchema;
+      return zodResolver(schema)(data, context, options);
+    },
     defaultValues: { email: "", password: "" },
   });
 
@@ -44,7 +51,10 @@ export function LoginForm() {
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (err: any) => {
-          const detail = err.response?.data?.detail || "Error al iniciar sesión";
+          const isUnauthorized = err.response?.status === 401;
+          const detail = isUnauthorized
+            ? "El usuario y/o contraseña son incorrectos"
+            : err.response?.data?.detail || "Error al iniciar sesión";
           setErrorMessage(detail);
         },
       });
