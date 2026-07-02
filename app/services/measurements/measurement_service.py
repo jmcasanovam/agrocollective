@@ -101,7 +101,7 @@ def _write_to_influx(
     client = get_influx_client()
     try:
         write_api = get_write_api(client)
-        write_api.write(bucket=settings.INFLUXDB_BUCKET, record=point)
+        write_api.write(bucket=settings.INFLUXDB_BUCKET_MEASUREMENTS, record=point)
     finally:
         client.close()
 

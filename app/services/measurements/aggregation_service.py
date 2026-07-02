@@ -103,7 +103,7 @@ class AggregationService:
         """Consulta InfluxDB y rellena las medias de los campos de sensor."""
         since_rfc = since.strftime("%Y-%m-%dT%H:%M:%SZ")
         flux = f"""
-            from(bucket: "{settings.INFLUXDB_BUCKET}")
+            from(bucket: "{settings.INFLUXDB_BUCKET_MEASUREMENTS}")
               |> range(start: {since_rfc})
               |> filter(fn: (r) => r._measurement == "{Measurements.SENSORS}")
               |> filter(fn: (r) => r.hash_plot == "{agg.hash_plot}")
