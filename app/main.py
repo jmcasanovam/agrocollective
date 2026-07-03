@@ -16,6 +16,8 @@ from app.api.routes.devices import router as devices_router
 from app.api.routes.sensors import router as sensors_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.intelligence import router as intelligence_router
+from app.api.routes.irrigation import router as irrigation_router
+from app.api.routes.harvests import router as harvests_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -55,6 +57,8 @@ app.include_router(devices_router)
 app.include_router(sensors_router)
 app.include_router(catalog_router)
 app.include_router(intelligence_router)
+app.include_router(irrigation_router)
+app.include_router(harvests_router)
 
 
 @app.get("/health")
