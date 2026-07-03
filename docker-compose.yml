@@ -66,6 +66,34 @@ services:
       fi
       "
 
+  simulator:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+
+    container_name: agro_simulator
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_HOST: postgres
+      INFLUXDB_HOST: influxdb
+      MQTT_HOST: mosquitto
+
+    volumes:
+      - .:/app
+
+    command: ["python", "scripts/live_sensor_publisher.py"]
+
+    depends_on:
+      - backend
+      - mosquitto
+      - influxdb
+      - postgres
+
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
 

@@ -71,7 +71,7 @@ _SOIL_NAMES = ["arenoso", "franco-arenoso", "franco", "franco-arcilloso", "arcil
 SOIL_FALLBACK = [_SOIL_NAMES[i % len(_SOIL_NAMES)] for i in range(N_PLOTS)]
 
 # Irrigación diaria añadida (mm) por perfil de gestión
-IRRIG_MM   = {"seco_eficiente": 2.5, "moderado": 5.0, "humedo_intensivo": 9.0}
+IRRIG_MM   = {"seco_eficiente": 2.5, "moderado": 5.0, "humedo_intensivo": 9.0, "secano": 0.0}
 MM_TO_PCT  = 0.4  # mm → % (factor genérico; dry escala el lado de la ETo)
 
 # Fallback de perfil por índice cuando la BD no responde
