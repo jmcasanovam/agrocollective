@@ -12,7 +12,7 @@ class Device(Base, BaseModelMixin):
 
     __tablename__ = "devices"
 
-    plot_id: Mapped[PyUUID] = mapped_column(ForeignKey("plots.id"), nullable=False)
+    plot_id: Mapped[PyUUID] = mapped_column(ForeignKey("plots.id"), nullable=False, unique=True)
     code: Mapped[str | None] = mapped_column(String(100), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

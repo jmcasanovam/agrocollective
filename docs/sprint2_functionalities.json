@@ -372,7 +372,6 @@
           "id (UUID, PK)",
           "plot_id (UUID, FK plots.id, unique)",
           "code (VARCHAR, unique)",
-          "name (VARCHAR, nullable)",
           "is_active (BOOLEAN)",
           "battery_mv (INTEGER)",
           "last_seen_at (TIMESTAMP, UTC)",

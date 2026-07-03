@@ -166,4 +166,7 @@ export const handlers = [
   http.get("*/plots/:plotId/performance-history", () => {
     return HttpResponse.json([]);
   }),
+  http.get("*/sensors", () => {
+    return HttpResponse.json([]);
+  }),
 ];

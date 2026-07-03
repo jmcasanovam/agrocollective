@@ -34,6 +34,9 @@ class DeviceRepository:
     def get_by_code(self, db: Session, code: str) -> Device | None:
         return db.query(Device).filter(Device.code == code).first()
 
+    def get_by_plot_id(self, db: Session, plot_id: UUID) -> Device | None:
+        return db.query(Device).filter(Device.plot_id == plot_id).first()
+
     def get_by_plot(self, db: Session, plot_id: UUID, user_id: UUID) -> Device | None:
         return (
             db.query(Device)

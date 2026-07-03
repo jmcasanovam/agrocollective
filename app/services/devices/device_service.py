@@ -30,6 +30,12 @@ class DeviceService:
                 detail="Plot not found"
             )
 
+        if device_repository.get_by_plot_id(db, plot_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Esta parcela ya tiene un dispositivo emparejado."
+            )
+
         return device_repository.create(db, device_data, plot_id)
 
     def get_by_plot(

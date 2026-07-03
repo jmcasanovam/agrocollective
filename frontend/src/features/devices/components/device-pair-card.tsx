@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { isAxiosError } from "axios";
 import { useCreateDevice } from "../api/create-device";
 import { useUpdateDevice } from "../api/update-device";
 import { useAssignSensors } from "../api/assign-sensors";
@@ -47,6 +48,7 @@ export function DevicePairCard({ plotId, plot }: DevicePairCardProps) {
   const [isActive, setIsActive] = useState<boolean>(true);
   const [deselectedSensorIds, setDeselectedSensorIds] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const selectedSensorIds = sensors
     ? sensors.filter((s) => !deselectedSensorIds.includes(s.id)).map((s) => s.id)
@@ -57,6 +59,7 @@ export function DevicePairCard({ plotId, plot }: DevicePairCardProps) {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMsg(null);
+    setErrorMsg(null);
     try {
       const device = await createDeviceMutation.mutateAsync({ code: generatedCode });
 
@@ -76,7 +79,11 @@ export function DevicePairCard({ plotId, plot }: DevicePairCardProps) {
 
       setSuccessMsg("Dispositivo registrado correctamente.");
     } catch (err) {
-      console.error(err);
+      if (isAxiosError(err) && err.response?.status === 409) {
+        setErrorMsg("Esta parcela ya tiene un dispositivo emparejado.");
+      } else {
+        setErrorMsg("Error al crear el dispositivo.");
+      }
     }
   };
 
@@ -125,9 +132,9 @@ export function DevicePairCard({ plotId, plot }: DevicePairCardProps) {
           Esta parcela aún no tiene un nodo IoT emparejado.
         </p>
 
-        {createDeviceMutation.isError && (
+        {errorMsg && (
           <div className="mb-4 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
-            Error al crear el dispositivo.
+            {errorMsg}
           </div>
         )}
 
