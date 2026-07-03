@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: { default: "AgroCollective", template: "%s | AgroCollective" },
-  description: "Plataforma IoT de gestión colectiva del agua — TFM",
+  description: "Plataforma IoT de gestión colectiva del agua: TFM",
 };
 
 export default function RootLayout({

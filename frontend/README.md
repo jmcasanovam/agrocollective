@@ -1,4 +1,4 @@
-# AgroCollective — Frontend
+# AgroCollective: Frontend
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS
 
@@ -111,7 +111,7 @@ ESLint (`eslint-plugin-import`) hace cumplir estos límites en CI y en pre-commi
 ## Testing
 
 - **Vitest** + **Testing Library** con `jsdom`.
-- **MSW** intercepta las llamadas HTTP en tests — sin mocks de módulos.
+- **MSW** intercepta las llamadas HTTP en tests, sin mocks de módulos.
 - `src/testing/test-utils.tsx` exporta un `render` envuelto en `QueryClientProvider`.
 - Los handlers MSW están en `src/testing/mocks/handlers.ts`.
 

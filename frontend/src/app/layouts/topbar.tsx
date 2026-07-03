@@ -20,7 +20,7 @@ export function Topbar() {
             </div>
             <div className="text-xs text-[#7d8c82]">
               {region ? `${region.name} (${region.code})` : "Sin región"} ·{" "}
-              {selectedFarm.area_ha ? `${selectedFarm.area_ha} ha` : "—"}
+              {selectedFarm.area_ha ? `${selectedFarm.area_ha} ha` : "no hay datos"}
             </div>
           </>
         ) : (

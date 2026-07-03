@@ -54,7 +54,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="text-xs text-[#7fa389] z-10">
-          SiAR · Picassent V17 · Baza GR01 — datos agroclimáticos oficiales
+          SiAR · Picassent V17 · Baza GR01: datos agroclimáticos oficiales
         </div>
         <div className="absolute -right-16 -bottom-16 w-72 h-72 rounded-full bg-gradient-to-tr from-[#4f8a5b]/35 to-transparent filter blur-2xl pointer-events-none" />
       </div>

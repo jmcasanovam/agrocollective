@@ -87,7 +87,7 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                   })}
                 </td>
                 <td className="py-2.5 text-center text-[#24302a] font-semibold">
-                  {row.air_temp !== null ? `${row.air_temp.toFixed(1)}°` : "—"}
+                  {row.air_temp !== null ? `${row.air_temp.toFixed(1)}°` : "no hay datos"}
                 </td>
                 <td className="py-2.5 text-center text-[#6b7a70]">
                   {row.air_temp_min !== null && row.air_temp_max !== null ? (
@@ -95,11 +95,13 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                       {row.air_temp_min.toFixed(0)}° / {row.air_temp_max.toFixed(0)}°
                     </span>
                   ) : (
-                    "—"
+                    "no hay datos"
                   )}
                 </td>
                 <td className="py-2.5 text-center text-[#24302a]">
-                  {row.relative_humidity !== null ? `${row.relative_humidity.toFixed(0)}%` : "—"}
+                  {row.relative_humidity !== null
+                    ? `${row.relative_humidity.toFixed(0)}%`
+                    : "no hay datos"}
                 </td>
                 <td className="py-2.5 text-center font-semibold text-[#2f5d3f]">
                   {row.precipitation !== null && row.precipitation > 0 ? (
@@ -111,7 +113,7 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                   )}
                 </td>
                 <td className="py-2.5 text-center text-[#8a5b52] font-mono font-semibold">
-                  {row.eto !== null ? row.eto.toFixed(1) : "—"}
+                  {row.eto !== null ? row.eto.toFixed(1) : "no hay datos"}
                 </td>
               </tr>
             ))}

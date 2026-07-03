@@ -57,7 +57,7 @@ export function MyFarmsDirectory() {
                   </span>
                 </div>
                 <div className="text-xs font-semibold text-[#2f5d3f] bg-[#eef5eb] px-3 py-1 rounded-full border border-[#d8e4d3] self-start sm:self-auto">
-                  Superficie: {farm.area_ha ? `${farm.area_ha} ha` : "— ha"}
+                  Superficie: {farm.area_ha ? `${farm.area_ha} ha` : "no hay datos"}
                 </div>
               </div>
 
@@ -134,7 +134,9 @@ function PlotRow({ plot }: { plot: Plot }) {
       <td className="py-3 font-semibold text-[#24302a]">{plot.name}</td>
       <td className="py-3 text-[#5c6b62]">{crop?.name || "No especificado"}</td>
       <td className="py-3 text-[#5c6b62]">{soil?.name || "No especificado"}</td>
-      <td className="py-3 text-[#5c6b62]">{plot.area_ha ? `${plot.area_ha} ha` : "—"}</td>
+      <td className="py-3 text-[#5c6b62]">
+        {plot.area_ha ? `${plot.area_ha} ha` : "no hay datos"}
+      </td>
       <td className="py-3 font-mono text-[#3a4a42]">
         {isLoading ? (
           <span className="text-gray-400 italic">Cargando...</span>
@@ -148,7 +150,7 @@ function PlotRow({ plot }: { plot: Plot }) {
         {device && device.battery_mv !== null ? (
           <span>{batteryPct}%</span>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">no hay datos</span>
         )}
       </td>
       <td className="py-3 text-right">
@@ -161,7 +163,7 @@ function PlotRow({ plot }: { plot: Plot }) {
             {isOnline ? "En línea" : "Offline"}
           </span>
         ) : (
-          <span className="text-[#a1aba3] text-[10.5px] italic">—</span>
+          <span className="text-[#a1aba3] text-[10.5px] italic">no hay datos</span>
         )}
       </td>
     </tr>

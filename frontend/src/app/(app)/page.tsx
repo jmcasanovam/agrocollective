@@ -68,7 +68,7 @@ export default function DashboardPage() {
             Próximo análisis
           </div>
           <div className="text-[13.5px] font-semibold text-white">
-            Hoy · 02:00 UTC — resultados disponibles por la mañana
+            Hoy · 02:00 UTC: resultados disponibles por la mañana
           </div>
         </div>
       </div>
@@ -96,11 +96,11 @@ export default function DashboardPage() {
             Los gauges de sensores aparecerán aquí cuando se conecte un dispositivo IoT.
           </p>
           <div className="flex gap-3">
-            {["Humedad suelo", "Temp. aire", "Humedad aire"].map((label) => (
+            {["Humedad suelo", "Temp. suelo", "Temp. aire", "Humedad aire"].map((label) => (
               <div key={label} className="flex-1 bg-[#f7f6f0] rounded-xl p-4 text-center">
                 <div className="w-14 h-14 mx-auto mb-2 rounded-full border-[6px] border-[#eae8e0]" />
                 <div className="text-xs font-semibold text-[#24302a]">{label}</div>
-                <div className="text-[11px] text-[#8a978d] mt-0.5">Sin datos</div>
+                <div className="text-[11px] text-[#8a978d] mt-0.5">no hay datos</div>
               </div>
             ))}
           </div>

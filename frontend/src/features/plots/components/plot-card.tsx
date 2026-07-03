@@ -70,7 +70,8 @@ export function PlotCard({ plot }: PlotCardProps) {
       <div className="min-w-[180px]">
         <div className="text-[15.5px] font-bold text-[#24302a]">{plot.name}</div>
         <div className="text-xs text-[#8a978d]">
-          {crop?.name ?? "—"} · {soil?.name ?? "—"} · {plot.area_ha ? `${plot.area_ha} ha` : "—"}
+          {crop?.name ?? "no hay datos"} · {soil?.name ?? "no hay datos"} ·{" "}
+          {plot.area_ha ? `${plot.area_ha} ha` : "no hay datos"}
         </div>
       </div>
 
@@ -85,7 +86,7 @@ export function PlotCard({ plot }: PlotCardProps) {
         <div>
           <div className="text-[11px] text-[#9aa79d]">Dispositivo</div>
           <div className="text-[13px] font-semibold text-[#3a4a42] font-mono">
-            {device?.code ?? "—"}
+            {device?.code ?? "no hay datos"}
           </div>
         </div>
       </div>
