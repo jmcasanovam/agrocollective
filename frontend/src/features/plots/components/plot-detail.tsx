@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePlot } from "../api/get-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
 import { PlotWeatherCard } from "./plot-weather-card";
+import { PlotSensorsCard } from "./plot-sensors-card";
+import { PlotIrrigationHarvestCard } from "./plot-irrigation-harvest-card";
+import { PlotIntelligenceCard } from "./plot-intelligence-card";
 interface PlotDetailProps {
   farmId: string | null;
   plotId: string;
@@ -115,39 +118,14 @@ export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
           {/* SiAR Climate Records */}
           <PlotWeatherCard plotId={plotId} />
 
-          {/* Readings Card Placeholder */}
-          <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 opacity-60 flex flex-col justify-between h-[180px]">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#6b7a70] uppercase tracking-wider mb-2">
-                <span>📊</span> Lecturas en tiempo real
-              </div>
-              <h4 className="text-md font-bold text-[#24302a] mb-1">Humedad y Temperatura</h4>
-              <p className="text-xs text-[#6b7a70]">
-                Los gráficos históricos, lecturas activas de sensores y alarmas de estrés hídrico se
-                habilitarán una vez que el pipeline reciba telemetría del dispositivo vinculado.
-              </p>
-            </div>
-            <div className="text-[10px] text-[#809185] italic font-semibold">
-              Módulo de Lecturas de Sensores · Próximamente (Flujo 4)
-            </div>
-          </div>
+          {/* Flow 4: real-time sensor readings */}
+          <PlotSensorsCard plotId={plotId} />
 
-          {/* Intelligence recommendations placeholder */}
-          <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 opacity-60 flex flex-col justify-between h-[180px]">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#6b7a70] uppercase tracking-wider mb-2">
-                <span>🤖</span> Inteligencia colectiva
-              </div>
-              <h4 className="text-md font-bold text-[#24302a] mb-1">Recomendaciones y Clústeres</h4>
-              <p className="text-xs text-[#6b7a70]">
-                Análisis comparativo K-Means frente a parcelas análogas de la red, detección de
-                anomalías con LOF y predicciones de necesidad de riego a 7 días.
-              </p>
-            </div>
-            <div className="text-[10px] text-[#809185] italic font-semibold">
-              Pipeline de Análisis Nocturno y Recomendaciones · Próximamente (Flujos 5 y 6)
-            </div>
-          </div>
+          {/* Flow 5: irrigation and harvest records */}
+          <PlotIrrigationHarvestCard plotId={plotId} />
+
+          {/* Flow 6: nightly intelligence pipeline results */}
+          <PlotIntelligenceCard plotId={plotId} />
         </div>
       </div>
     </div>
