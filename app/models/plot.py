@@ -1,6 +1,6 @@
 from uuid import UUID as PyUUID
 
-from sqlalchemy import Float, ForeignKey, String
+from sqlalchemy import Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -10,6 +10,7 @@ from app.models.mixins import BaseModelMixin
 class Plot(Base, BaseModelMixin):
 
     __tablename__ = "plots"
+    __table_args__ = (UniqueConstraint("farm_id", "name", name="uq_plot_farm_name"),)
 
     farm_id: Mapped[PyUUID] = mapped_column(ForeignKey("farms.id"), nullable=False)
     crop_id: Mapped[PyUUID] = mapped_column(ForeignKey("crops.id"), nullable=False)

@@ -1,14 +1,16 @@
 /* eslint-disable react-hooks/incompatible-library */
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { isAxiosError } from "axios";
 import { useCreatePlot } from "../api/create-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
 
 const plotSchema = z.object({
-  name: z.string().optional(),
+  name: z.string().min(1, "El nombre es obligatorio"),
   crop_id: z.string().min(1, "El cultivo es obligatorio"),
   soil_id: z.string().min(1, "El tipo de suelo es obligatorio"),
   area_ha: z.string().optional(),
@@ -28,6 +30,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
   const createPlotMutation = useCreatePlot(farmId);
   const { data: crops } = useCrops();
   const { data: soils } = useSoils();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -50,13 +53,15 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
 
   const cropValue = watch("crop_id");
   const soilValue = watch("soil_id");
-  const canSubmit = !!(cropValue && soilValue);
+  const nameValue = watch("name");
+  const canSubmit = !!(cropValue && soilValue && nameValue);
 
   const onSubmit = (data: PlotFormInput) => {
     if (!canSubmit) return;
+    setSubmitError(null);
     createPlotMutation.mutate(
       {
-        name: data.name || "Nueva parcela",
+        name: data.name,
         crop_id: data.crop_id,
         soil_id: data.soil_id,
         area_ha: data.area_ha ? Number(data.area_ha) : null,
@@ -66,6 +71,13 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
         onSuccess: () => {
           reset();
           onClose();
+        },
+        onError: (error) => {
+          if (isAxiosError(error) && error.response?.status === 409) {
+            setSubmitError("Ya existe una parcela con ese nombre en esta finca.");
+            return;
+          }
+          setSubmitError("No se pudo crear la parcela. Inténtalo de nuevo.");
         },
       },
     );
@@ -102,10 +114,10 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Name (optional) */}
+          {/* Name (required, unico por finca) */}
           <div>
             <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Nombre <span className="text-[#9aa79d] font-normal">(opcional)</span>
+              Nombre <span className="text-[#c0453d]">*</span>
             </label>
             <input
               type="text"
@@ -113,6 +125,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
               {...register("name")}
               className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
             />
+            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
           </div>
 
           {/* Crop + Soil (both required) */}
@@ -186,6 +199,8 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
               className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
             />
           </div>
+
+          {submitError && <p className="text-xs text-red-500">{submitError}</p>}
 
           {/* Actions */}
           <div className="flex gap-2.5 justify-end pt-2">

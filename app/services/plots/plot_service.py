@@ -34,6 +34,12 @@ class PlotService:
                 detail="Farm not found"
             )
 
+        if plot_data.name and plot_repository.get_by_farm_and_name(db, farm_id, plot_data.name):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ya existe una parcela con ese nombre en esta finca."
+            )
+
         return plot_repository.create(
             db,
             plot_data,
@@ -119,6 +125,14 @@ class PlotService:
                 status_code=404,
                 detail="Plot not found"
             )
+
+        if plot_data.name and plot_data.name != plot.name:
+            existing = plot_repository.get_by_farm_and_name(db, farm_id, plot_data.name)
+            if existing and existing.id != plot.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe una parcela con ese nombre en esta finca."
+                )
 
         return plot_repository.update(
             db,

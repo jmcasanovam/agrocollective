@@ -19,7 +19,7 @@ User → Farm (1:N) → Plot (1:N) → Device (1:N)
 | Entidad | Campos relevantes para la UI |
 |---------|------------------------------|
 | `Farm` | `name`, `latitude`, `longitude`, `area_ha` |
-| `Plot` | `name`, `area_ha`, `crop_id` → cultivo, `soil_id` → tipo de suelo |
+| `Plot` | `name` (único por finca, `uq_plot_farm_name`), `area_ha`, `crop_id` → cultivo, `soil_id` → tipo de suelo |
 | `Device` | `code` (e.g. `AGRO-P00-001`), `last_seen_at`, `battery_mv`, `is_active` |
 | `IrrigationRecord` | `week_start`, `irrigation_mm` |
 | `Harvest` | `harvest_date`, `yield_kg_ha`, `water_consumed_m3_ha` |
@@ -59,7 +59,7 @@ Al seleccionar una finca → listado de sus parcelas. Para los selectores de cul
 
 ```
 GET    /farms/{farm_id}/plots              → lista de parcelas
-POST   /farms/{farm_id}/plots   { name, crop_id, soil_id, area_ha }
+POST   /farms/{farm_id}/plots   { name, crop_id, soil_id, area_ha }   → 409 si el nombre ya existe en esa finca
 GET    /farms/{farm_id}/plots/{plot_id}    → detalle
 PUT    /farms/{farm_id}/plots/{plot_id}    → editar
 DELETE /farms/{farm_id}/plots/{plot_id}    → eliminar
@@ -246,7 +246,7 @@ Cada registro incluye: cluster asignado, medias de sensores (humedad suelo, temp
 | `/auth/login` | POST | No | Obtener JWT |
 | `/farms` | GET / POST | Sí | Listar / crear fincas |
 | `/farms/{id}` | GET / PUT / DELETE | Sí | Detalle / editar / eliminar finca |
-| `/farms/{farm_id}/plots` | GET / POST | Sí | Listar / crear parcelas |
+| `/farms/{farm_id}/plots` | GET / POST | Sí | Listar / crear parcelas (POST 409 si el nombre se repite en la finca) |
 | `/farms/{farm_id}/plots/{plot_id}` | GET / PUT / DELETE | Sí | Detalle / editar / eliminar parcela |
 | `/plots/{id}/devices` | GET / POST | Sí | Dispositivos de la parcela |
 | `/plots/{id}/weather` | GET | Sí | Clima SiAR de los últimos 30 días |

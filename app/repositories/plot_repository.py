@@ -33,6 +33,9 @@ class PlotRepository:
     def get_all_by_farm(self, db: Session, farm_id: UUID) -> list[Plot]:
         return db.query(Plot).filter(Plot.farm_id == farm_id).all()
 
+    def get_by_farm_and_name(self, db: Session, farm_id: UUID, name: str) -> Plot | None:
+        return db.query(Plot).filter(Plot.farm_id == farm_id, Plot.name == name).first()
+
     def get_by_id(self, db: Session, plot_id: UUID) -> Plot | None:
         return db.query(Plot).filter(Plot.id == plot_id).first()
 
