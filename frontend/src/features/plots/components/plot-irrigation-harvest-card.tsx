@@ -89,8 +89,14 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
           </h4>
           <form onSubmit={handleIrrigationSubmit} className="space-y-2">
             <div>
-              <label className="block text-[11px] text-[#6b7a70] mb-1">Semana (inicio)</label>
+              <label
+                htmlFor="irrigation-week-start"
+                className="block text-[11px] text-[#6b7a70] mb-1"
+              >
+                Semana (inicio)
+              </label>
               <input
+                id="irrigation-week-start"
                 type="date"
                 value={weekStart}
                 onChange={(e) => setWeekStart(e.target.value)}
@@ -99,8 +105,11 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
               />
             </div>
             <div>
-              <label className="block text-[11px] text-[#6b7a70] mb-1">Volumen (mm)</label>
+              <label htmlFor="irrigation-mm" className="block text-[11px] text-[#6b7a70] mb-1">
+                Volumen (mm)
+              </label>
               <input
+                id="irrigation-mm"
                 type="number"
                 step="0.1"
                 min="0.1"
@@ -149,8 +158,11 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
           <h4 className="text-xs font-bold text-[#3a4a42] uppercase tracking-wide">Cosecha</h4>
           <form onSubmit={handleHarvestSubmit} className="space-y-2">
             <div>
-              <label className="block text-[11px] text-[#6b7a70] mb-1">Fecha de cosecha</label>
+              <label htmlFor="harvest-date" className="block text-[11px] text-[#6b7a70] mb-1">
+                Fecha de cosecha
+              </label>
               <input
+                id="harvest-date"
                 type="date"
                 value={harvestDate}
                 onChange={(e) => setHarvestDate(e.target.value)}
@@ -160,8 +172,11 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] text-[#6b7a70] mb-1">Rendimiento (kg/ha)</label>
+                <label htmlFor="harvest-yield" className="block text-[11px] text-[#6b7a70] mb-1">
+                  Rendimiento (kg/ha)
+                </label>
                 <input
+                  id="harvest-yield"
                   type="number"
                   step="1"
                   placeholder="4200"
@@ -171,8 +186,11 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[#6b7a70] mb-1">Agua (m³/ha)</label>
+                <label htmlFor="harvest-water" className="block text-[11px] text-[#6b7a70] mb-1">
+                  Agua (m³/ha)
+                </label>
                 <input
+                  id="harvest-water"
                   type="number"
                   step="0.1"
                   placeholder="350"

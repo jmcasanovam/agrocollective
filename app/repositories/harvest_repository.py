@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -7,6 +8,13 @@ from app.schemas.harvest import HarvestCreate
 
 
 class HarvestRepository:
+
+    def get_by_plot_and_date(self, db: Session, plot_id: UUID, harvest_date: date) -> Harvest | None:
+        return (
+            db.query(Harvest)
+            .filter(Harvest.plot_id == plot_id, Harvest.harvest_date == harvest_date)
+            .first()
+        )
 
     def create(self, db: Session, plot_id: UUID, data: HarvestCreate) -> Harvest:
         harvest = Harvest(
@@ -20,11 +28,13 @@ class HarvestRepository:
         db.refresh(harvest)
         return harvest
 
-    def get_all_by_plot(self, db: Session, plot_id: UUID) -> list[Harvest]:
+    def get_all_by_plot(self, db: Session, plot_id: UUID, limit: int = 100, offset: int = 0) -> list[Harvest]:
         return (
             db.query(Harvest)
             .filter(Harvest.plot_id == plot_id)
             .order_by(Harvest.harvest_date.desc())
+            .offset(offset)
+            .limit(limit)
             .all()
         )
 

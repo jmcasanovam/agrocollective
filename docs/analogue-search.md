@@ -95,6 +95,10 @@ alembic/versions/
 - La distancia en el espacio normalizado es sensible a la imputación de `None → 0`. Parcelas sin datos de cosecha o riego tienden a agruparse entre sí.
 - Con menos de 2 parcelas en el sistema no se generan análogas.
 
+## Nota de diseño: sin nombre de parcela en el front
+
+Como la búsqueda es global, `analogue_plot_id` casi siempre apunta a una parcela de **otro usuario**. No existe (ni debería existir) un endpoint que devuelva el nombre de una parcela ajena: `plot_repository.get_by_id_and_user` filtra siempre por el usuario autenticado, y `hash_plot` existe justo para que este tipo de comparación entre parcelas sea posible sin exponer identidad. El frontend (`plot-intelligence-card.tsx`) muestra cada análoga como "Parcela análoga #{rank}" en vez de intentar resolver un nombre. Si en el futuro se quisiera mostrar algo más que el ID, debería ser un dato ya anonimizado (cultivo, tipo de suelo, cluster), nunca el nombre real de la parcela.
+
 ---
 
 ## Salida del pipeline (ejemplo)

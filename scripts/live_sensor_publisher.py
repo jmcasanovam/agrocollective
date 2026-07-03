@@ -102,18 +102,6 @@ def _normalize_profile(raw_profile: str | None) -> str:
     return PROFILE_UI_TO_SIM.get(raw_profile, raw_profile)
 
 
-def _nearest_region(farm, regions: list):
-    candidates = [r for r in regions if r.latitude is not None and r.longitude is not None]
-    if not candidates:
-        return None
-    if farm.latitude is None or farm.longitude is None:
-        return candidates[0]
-    return min(
-        candidates,
-        key=lambda r: (r.latitude - farm.latitude) ** 2 + (r.longitude - farm.longitude) ** 2,
-    )
-
-
 def load_active_devices() -> list[dict]:
     """Devuelve un dict por dispositivo activo con todo lo necesario para simularlo."""
     from app.database.postgres import SessionLocal
@@ -122,6 +110,7 @@ def load_active_devices() -> list[dict]:
     from app.models.farm import Farm
     from app.models.region import Region
     from app.models.soil import Soil
+    from app.services.regions.region_resolver import nearest_region
 
     db = SessionLocal()
     try:
@@ -143,7 +132,7 @@ def load_active_devices() -> list[dict]:
                 continue  # sin hash_plot no se puede anonimizar en InfluxDB (igual que el backend)
 
             region = regions_by_id.get(farm.region_id) if farm.region_id else None
-            region = region or _nearest_region(farm, regions) or default_region
+            region = region or nearest_region(farm, regions) or default_region
             if region is None or not region.siar_station_code:
                 continue  # no hay ninguna estación SiAR de referencia disponible
 

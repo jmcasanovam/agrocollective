@@ -93,3 +93,15 @@ from(bucket: "agrocollective_siar")
   |> range(start: 2025-06-23)
   |> filter(fn: (r) => r._measurement == "weather")
 ```
+
+---
+
+## Qué región usa una finca sin `region_id`
+
+El alta de finca permite elegir región, pero el campo es opcional (`FarmCreate.region_id: UUID | None`). `GET /plots/{id}/weather` y el publicador de telemetría en vivo (`scripts/live_sensor_publisher.py`) necesitan igualmente una estación SiAR de referencia, así que ambos resuelven la región con `app/services/regions/region_resolver.py`:
+
+1. Si la finca tiene `region_id`, se usa esa región.
+2. Si no, se calcula la región con estación SiAR más cercana por distancia euclidiana entre `(farm.latitude, farm.longitude)` y `(region.latitude, region.longitude)`.
+3. Si la finca tampoco tiene coordenadas, se usa la primera región del catálogo.
+
+Con el catálogo actual (`VALENCIA/V17`, `BAZA/GR01`), cualquier finca del sistema queda anclada a una de las dos sin necesidad de que el usuario elija región explícitamente.

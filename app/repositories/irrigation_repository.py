@@ -19,11 +19,15 @@ class IrrigationRepository:
         db.refresh(record)
         return record
 
-    def get_all_by_plot(self, db: Session, plot_id: UUID) -> list[IrrigationRecord]:
+    def get_all_by_plot(
+        self, db: Session, plot_id: UUID, limit: int = 100, offset: int = 0
+    ) -> list[IrrigationRecord]:
         return (
             db.query(IrrigationRecord)
             .filter(IrrigationRecord.plot_id == plot_id)
             .order_by(IrrigationRecord.week_start.desc())
+            .offset(offset)
+            .limit(limit)
             .all()
         )
 

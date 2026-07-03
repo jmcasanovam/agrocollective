@@ -99,6 +99,8 @@ def get_recommendations(
 def get_anomalies(
     plot_id: UUID,
     run_date: date | None = Query(default=None, description="Filtrar por fecha de ejecución (YYYY-MM-DD)"),
+    limit: int = Query(default=100, ge=1, le=500, description="Número máximo de registros a devolver"),
+    offset: int = Query(default=0, ge=0, description="Registros a saltar (paginación)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -109,7 +111,7 @@ def get_anomalies(
     query = db.query(PlotAnomaly).filter(PlotAnomaly.plot_id == plot_id)
     if run_date:
         query = query.filter(PlotAnomaly.run_date == run_date)
-    rows = query.order_by(PlotAnomaly.run_date.desc()).all()
+    rows = query.order_by(PlotAnomaly.run_date.desc()).offset(offset).limit(limit).all()
 
     return [AnomalyResponse.from_orm_with_features(r) for r in rows]
 
@@ -231,17 +233,20 @@ def get_plot_weather_history(
     """
     plot = _get_plot_or_404(db, plot_id, current_user.id)
     farm = plot.farm
-    if not farm or not farm.region:
+    if not farm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La parcela no está asociada a una finca o región con estación SiAR."
+            detail="La parcela no está asociada a ninguna finca."
         )
-    
-    station_code = farm.region.siar_station_code
+
+    from app.services.regions.region_resolver import resolve_region_for_farm
+
+    region = resolve_region_for_farm(db, farm)
+    station_code = region.siar_station_code if region else None
     if not station_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La región no tiene código de estación SiAR configurado."
+            detail="No hay ninguna región con estación SiAR configurada en el catálogo."
         )
 
     # Consultar InfluxDB
