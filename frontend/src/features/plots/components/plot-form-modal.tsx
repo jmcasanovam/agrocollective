@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/incompatible-library */
 "use client";
 
 import { useState } from "react";
@@ -10,10 +9,20 @@ import { useCreatePlot } from "../api/create-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
 
 const plotSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "El nombre debe tener al menos 2 caracteres")
+    .max(150, "El nombre no puede superar los 150 caracteres"),
   crop_id: z.string().min(1, "El cultivo es obligatorio"),
   soil_id: z.string().min(1, "El tipo de suelo es obligatorio"),
-  area_ha: z.string().optional(),
+  area_ha: z
+    .string()
+    .min(1, "La superficie es obligatoria")
+    .refine(
+      (v) => !Number.isNaN(Number(v)) && Number(v) > 0 && Number(v) <= 100000,
+      "Debe ser un número entre 0 y 100.000 ha",
+    ),
   management_profile: z.string().optional(),
 });
 
@@ -35,9 +44,8 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
     reset,
-    watch,
   } = useForm<PlotFormInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(plotSchema as any),
@@ -51,10 +59,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
     mode: "onChange",
   });
 
-  const cropValue = watch("crop_id");
-  const soilValue = watch("soil_id");
-  const nameValue = watch("name");
-  const canSubmit = !!(cropValue && soilValue && nameValue);
+  const canSubmit = isValid;
 
   const onSubmit = (data: PlotFormInput) => {
     if (!canSubmit) return;
@@ -64,7 +69,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
         name: data.name,
         crop_id: data.crop_id,
         soil_id: data.soil_id,
-        area_ha: data.area_ha ? Number(data.area_ha) : null,
+        area_ha: Number(data.area_ha),
         management_profile: data.management_profile || null,
       },
       {
@@ -122,6 +127,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
             <input
               type="text"
               placeholder="Parcela Oeste"
+              maxLength={150}
               {...register("name")}
               className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
             />
@@ -129,7 +135,7 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
           </div>
 
           {/* Crop + Soil (both required) */}
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
                 Cultivo <span className="text-[#c0453d]">*</span>
@@ -170,34 +176,39 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
             </div>
           </div>
 
-          {/* Profile (optional) */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Perfil de gestión <span className="text-[#9aa79d] font-normal">(opcional)</span>
-            </label>
-            <select
-              {...register("management_profile")}
-              className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
-            >
-              <option value="Riego deficitario controlado">Seco eficiente</option>
-              <option value="Estándar SiAR">Moderado</option>
-              <option value="Riego por goteo optimizado">Húmedo intensivo</option>
-              <option value="Secano">Secano</option>
-            </select>
-          </div>
-
-          {/* Area (optional) */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Superficie (ha) <span className="text-[#9aa79d] font-normal">(opcional)</span>
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              placeholder="4.2"
-              {...register("area_ha")}
-              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
-            />
+          {/* Area (required) + Profile (optional) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Superficie (ha) <span className="text-[#c0453d]">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="100000"
+                placeholder="4.2"
+                {...register("area_ha")}
+                className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+              />
+              {errors.area_ha && (
+                <p className="mt-1 text-xs text-red-500">{errors.area_ha.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Perfil de gestión <span className="text-[#9aa79d] font-normal">(opcional)</span>
+              </label>
+              <select
+                {...register("management_profile")}
+                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+              >
+                <option value="Riego deficitario controlado">Seco eficiente</option>
+                <option value="Estándar SiAR">Moderado</option>
+                <option value="Riego por goteo optimizado">Húmedo intensivo</option>
+                <option value="Secano">Secano</option>
+              </select>
+            </div>
           </div>
 
           {submitError && <p className="text-xs text-red-500">{submitError}</p>}

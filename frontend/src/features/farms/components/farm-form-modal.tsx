@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/incompatible-library */
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -8,11 +7,33 @@ import { useCreateFarm } from "../api/create-farm";
 import { useRegions } from "../api/get-regions";
 
 const farmSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
-  region_id: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-  area_ha: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(2, "El nombre debe tener al menos 2 caracteres")
+    .max(150, "El nombre no puede superar los 150 caracteres"),
+  region_id: z.string().min(1, "La región es obligatoria"),
+  latitude: z
+    .string()
+    .min(1, "La latitud es obligatoria")
+    .refine(
+      (v) => !Number.isNaN(Number(v)) && Number(v) >= -90 && Number(v) <= 90,
+      "Debe estar entre -90 y 90",
+    ),
+  longitude: z
+    .string()
+    .min(1, "La longitud es obligatoria")
+    .refine(
+      (v) => !Number.isNaN(Number(v)) && Number(v) >= -180 && Number(v) <= 180,
+      "Debe estar entre -180 y 180",
+    ),
+  area_ha: z
+    .string()
+    .min(1, "La superficie es obligatoria")
+    .refine(
+      (v) => !Number.isNaN(Number(v)) && Number(v) > 0 && Number(v) <= 100000,
+      "Debe ser un número entre 0 y 100.000 ha",
+    ),
 });
 
 type FarmFormInput = z.infer<typeof farmSchema>;
@@ -29,9 +50,8 @@ export function FarmFormModal({ isOpen, onClose }: FarmFormModalProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
     reset,
-    watch,
   } = useForm<FarmFormInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(farmSchema as any),
@@ -45,18 +65,17 @@ export function FarmFormModal({ isOpen, onClose }: FarmFormModalProps) {
     mode: "onChange",
   });
 
-  const nameValue = watch("name");
-  const canSubmit = !!(nameValue && nameValue.trim());
+  const canSubmit = isValid;
 
   const onSubmit = (data: FarmFormInput) => {
     if (!canSubmit) return;
     createFarmMutation.mutate(
       {
         name: data.name,
-        region_id: data.region_id || null,
-        latitude: data.latitude ? Number(data.latitude) : null,
-        longitude: data.longitude ? Number(data.longitude) : null,
-        area_ha: data.area_ha ? Number(data.area_ha) : null,
+        region_id: data.region_id,
+        latitude: Number(data.latitude),
+        longitude: Number(data.longitude),
+        area_ha: Number(data.area_ha),
       },
       {
         onSuccess: () => {
@@ -96,78 +115,99 @@ export function FarmFormModal({ isOpen, onClose }: FarmFormModalProps) {
         <p className="text-[13px] text-[#8a978d] m-0 mb-5">Registra una explotación en tu red.</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Name (required) */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Nombre <span className="text-[#c0453d]">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Finca La Vega"
-              {...register("name")}
-              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
-            />
-            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
-          </div>
-
-          {/* Region (optional) */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Región <span className="text-[#9aa79d] font-normal">(opcional)</span>
-            </label>
-            <select
-              {...register("region_id")}
-              className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
-            >
-              <option value="">Sin región asignada</option>
-              {regions?.map((reg) => (
-                <option key={reg.id} value={reg.id}>
-                  {reg.name} ({reg.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Lat/Lon (optional) */}
-          <div className="grid grid-cols-2 gap-3.5">
+          {/* Name + Region */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-                Latitud <span className="text-[#9aa79d] font-normal">(opc.)</span>
+                Nombre <span className="text-[#c0453d]">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Finca La Vega"
+                maxLength={150}
+                {...register("name")}
+                className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+              />
+              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+            </div>
+
+            <div>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Región <span className="text-[#c0453d]">*</span>
+              </label>
+              <select
+                {...register("region_id")}
+                defaultValue=""
+                className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+              >
+                <option value="" disabled>
+                  Selecciona región…
+                </option>
+                {regions?.map((reg) => (
+                  <option key={reg.id} value={reg.id}>
+                    {reg.name} ({reg.code})
+                  </option>
+                ))}
+              </select>
+              {errors.region_id && (
+                <p className="mt-1 text-xs text-red-500">{errors.region_id.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Lat/Lon/Area */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Latitud <span className="text-[#c0453d]">*</span>
               </label>
               <input
                 type="number"
                 step="0.0001"
+                min="-90"
+                max="90"
                 placeholder="39.3610"
                 {...register("latitude")}
                 className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
               />
+              {errors.latitude && (
+                <p className="mt-1 text-xs text-red-500">{errors.latitude.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-                Longitud <span className="text-[#9aa79d] font-normal">(opc.)</span>
+                Longitud <span className="text-[#c0453d]">*</span>
               </label>
               <input
                 type="number"
                 step="0.0001"
+                min="-180"
+                max="180"
                 placeholder="-0.5120"
                 {...register("longitude")}
                 className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
               />
+              {errors.longitude && (
+                <p className="mt-1 text-xs text-red-500">{errors.longitude.message}</p>
+              )}
             </div>
-          </div>
-
-          {/* Area (optional) */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
-              Superficie (ha) <span className="text-[#9aa79d] font-normal">(opcional)</span>
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              placeholder="12.4"
-              {...register("area_ha")}
-              className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
-            />
+            <div>
+              <label className="block text-[13px] font-medium text-[#3a4a42] mb-1.5">
+                Superficie (ha) <span className="text-[#c0453d]">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="100000"
+                placeholder="12.4"
+                {...register("area_ha")}
+                className="w-full h-10 border border-[#d9d3c5] rounded-lg px-3 text-sm text-[#24302a] bg-white outline-none focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
+              />
+              {errors.area_ha && (
+                <p className="mt-1 text-xs text-red-500">{errors.area_ha.message}</p>
+              )}
+            </div>
           </div>
 
           {/* Actions */}
