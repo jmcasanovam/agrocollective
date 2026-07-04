@@ -293,6 +293,9 @@ function AnaloguesTab({
           </span>
         </div>
       ))}
+      <p className="text-[10px] text-[#b7bfb4] text-right pt-1">
+        Última actualización: {formatRunDate(sorted[0].run_date)}
+      </p>
     </div>
   );
 }
@@ -318,27 +321,32 @@ function PredictionsTab({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {data.map((prediction) => {
-        const label = labels[prediction.target] ?? { title: prediction.target, unit: "" };
-        return (
-          <div key={prediction.id} className="border border-[#f0ece2] rounded-xl p-4 space-y-2">
-            <h5 className="text-xs font-bold text-[#6b7a70] uppercase tracking-wide m-0">
-              {label.title}
-            </h5>
-            <p className="text-2xl font-bold text-[#24302a] m-0">
-              {prediction.predicted_value !== null
-                ? `${prediction.predicted_value.toFixed(1)} ${label.unit}`
-                : "Sin dato"}
-            </p>
-            <p className="text-[11px] text-[#9aa79d] m-0">
-              {prediction.model_r2 !== null
-                ? `R² del modelo: ${prediction.model_r2.toFixed(2)} · ${prediction.n_training_samples} parcelas de entrenamiento`
-                : "Modelo aún sin suficientes datos de entrenamiento"}
-            </p>
-          </div>
-        );
-      })}
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {data.map((prediction) => {
+          const label = labels[prediction.target] ?? { title: prediction.target, unit: "" };
+          return (
+            <div key={prediction.id} className="border border-[#f0ece2] rounded-xl p-4 space-y-2">
+              <h5 className="text-xs font-bold text-[#6b7a70] uppercase tracking-wide m-0">
+                {label.title}
+              </h5>
+              <p className="text-2xl font-bold text-[#24302a] m-0">
+                {prediction.predicted_value !== null
+                  ? `${prediction.predicted_value.toFixed(1)} ${label.unit}`
+                  : "Sin dato"}
+              </p>
+              <p className="text-[11px] text-[#9aa79d] m-0">
+                {prediction.model_r2 !== null
+                  ? `R² del modelo: ${prediction.model_r2.toFixed(2)} · ${prediction.n_training_samples} parcelas de entrenamiento`
+                  : "Modelo aún sin suficientes datos de entrenamiento"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-[#b7bfb4] text-right">
+        Última actualización: {formatRunDate(data[0].run_date)}
+      </p>
     </div>
   );
 }
@@ -361,6 +369,7 @@ function HistoryTab({
   }
 
   const chronological = [...data].reverse();
+  const latest = chronological[chronological.length - 1];
 
   const metrics: {
     key: keyof (typeof chronological)[number];
@@ -370,11 +379,56 @@ function HistoryTab({
   }[] = [
     { key: "yield_kg_ha", label: "Rendimiento", unit: "kg/ha", color: "#2f5d3f" },
     { key: "water_efficiency", label: "Eficiencia hídrica", unit: "kg/m³", color: "#3a6ea5" },
+    { key: "predicted_yield", label: "Rendimiento previsto (ML)", unit: "kg/ha", color: "#7a5c9e" },
+    {
+      key: "predicted_efficiency",
+      label: "Eficiencia prevista (ML)",
+      unit: "kg/m³",
+      color: "#9e5c7a",
+    },
     { key: "avg_soil_humidity", label: "Humedad media de suelo", unit: "%", color: "#8a5b52" },
+    { key: "avg_air_humidity", label: "Humedad media del aire", unit: "%", color: "#5c8fc4" },
+    { key: "avg_soil_temp", label: "Temp. media del suelo", unit: "°C", color: "#b2673e" },
+    { key: "avg_air_temp", label: "Temp. media del aire", unit: "°C", color: "#d98a2b" },
+    { key: "avg_irrigation_mm", label: "Riego medio diario", unit: "mm", color: "#4f8a5b" },
+    { key: "total_water_mm", label: "Agua total aplicada", unit: "mm", color: "#2f6d7a" },
   ];
 
   return (
     <div className="space-y-5 max-h-[400px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="border border-[#f0ece2] rounded-lg p-2 text-center">
+          <span className="block text-[9px] text-[#9aa79d] uppercase font-bold">Riego/sem.</span>
+          <span className="text-[13px] font-bold text-[#24302a]">
+            {latest.irrigation_frequency ?? "—"}
+          </span>
+        </div>
+        <div className="border border-[#f0ece2] rounded-lg p-2 text-center">
+          <span className="block text-[9px] text-[#9aa79d] uppercase font-bold">Estado</span>
+          <span
+            className={`text-[11px] font-bold ${latest.is_anomaly ? "text-[#b23a33]" : "text-[#356440]"}`}
+          >
+            {latest.is_anomaly ? "Anómala" : "Normal"}
+          </span>
+        </div>
+        <div className="border border-[#f0ece2] rounded-lg p-2 text-center">
+          <span className="block text-[9px] text-[#9aa79d] uppercase font-bold">LOF score</span>
+          <span className="text-[13px] font-bold font-mono text-[#24302a]">
+            {latest.lof_score !== null ? latest.lof_score.toFixed(2) : "—"}
+          </span>
+        </div>
+        <div className="border border-[#f0ece2] rounded-lg p-2 text-center">
+          <span className="block text-[9px] text-[#9aa79d] uppercase font-bold">
+            Recomendaciones
+          </span>
+          <span className="text-[13px] font-bold text-[#24302a]">
+            {latest.n_recommendations}{" "}
+            <span className="text-[10px] font-normal text-[#9aa79d]">
+              ({latest.n_high_priority} alta)
+            </span>
+          </span>
+        </div>
+      </div>
       {metrics.map((metric) => {
         const values = chronological.map((entry) => entry[metric.key] as number | null);
         const path = buildLinePath(values, CHART_WIDTH, CHART_HEIGHT);

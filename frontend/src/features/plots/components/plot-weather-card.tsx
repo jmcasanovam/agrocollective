@@ -135,6 +135,9 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                 Hum. (%)
               </th>
               <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+                Hum. Mín/Máx
+              </th>
+              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
                 Lluvia (mm)
               </th>
               <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
@@ -167,6 +170,16 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                   {row.relative_humidity !== null
                     ? `${row.relative_humidity.toFixed(0)}%`
                     : "no hay datos"}
+                </td>
+                <td className="py-2.5 text-center text-[#6b7a70]">
+                  {row.relative_humidity_min !== null && row.relative_humidity_max !== null ? (
+                    <span>
+                      {row.relative_humidity_min.toFixed(0)}% /{" "}
+                      {row.relative_humidity_max.toFixed(0)}%
+                    </span>
+                  ) : (
+                    "no hay datos"
+                  )}
                 </td>
                 <td className="py-2.5 text-center font-semibold text-[#2f5d3f]">
                   {row.precipitation !== null && row.precipitation > 0 ? (

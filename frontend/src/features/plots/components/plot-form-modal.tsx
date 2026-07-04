@@ -203,9 +203,9 @@ export function PlotFormModal({ farmId, farmName, isOpen, onClose }: PlotFormMod
                 {...register("management_profile")}
                 className="w-full h-10 border border-[#d9d3c5] bg-white rounded-lg px-2.5 text-sm text-[#24302a] outline-none cursor-pointer focus:ring-2 focus:ring-[#2f5d3f]/30 font-[inherit]"
               >
-                <option value="Riego deficitario controlado">Seco eficiente</option>
-                <option value="Estándar SiAR">Moderado</option>
-                <option value="Riego por goteo optimizado">Húmedo intensivo</option>
+                <option value="Riego deficitario controlado">Riego deficitario controlado</option>
+                <option value="Estándar SiAR">Estándar SiAR</option>
+                <option value="Riego por goteo optimizado">Riego por goteo optimizado</option>
                 <option value="Secano">Secano</option>
               </select>
             </div>

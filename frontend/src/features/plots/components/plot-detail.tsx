@@ -87,6 +87,14 @@ export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
               </div>
               <div>
                 <span className="block text-[10px] text-[#6b7a70] uppercase font-bold">
+                  Perfil de riego
+                </span>
+                <span className="text-sm font-semibold text-[#24302a]">
+                  {plot.management_profile || "Secano"}
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-[#6b7a70] uppercase font-bold">
                   Hash anónimo
                 </span>
                 <span className="text-xs font-mono text-[#6b7a70] break-all bg-[#f4f2eb] px-1.5 py-0.5 rounded">

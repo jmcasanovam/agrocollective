@@ -37,10 +37,6 @@ export function FarmCard({ farm, onClick }: FarmCardProps) {
       <div>
         <div className="flex justify-between items-start mb-2">
           <h4 className="text-lg font-bold text-[#24302a] leading-snug">{farm.name}</h4>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#edf5ef] text-[#2f5d3f]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4ab46b] animate-pulse" />
-            Salud · óptima
-          </span>
         </div>
         <p className="text-xs text-[#6b7a70]">
           {region ? `${region.name} (${region.code})` : "Sin región asignada"}

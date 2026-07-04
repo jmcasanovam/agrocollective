@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import { useIrrigation } from "../api/get-irrigation";
 import { useCreateIrrigation } from "../api/create-irrigation";
 import { useHarvests } from "../api/get-harvests";
@@ -28,6 +29,7 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
   const [harvestDate, setHarvestDate] = useState("");
   const [yieldKgHa, setYieldKgHa] = useState("");
   const [waterConsumedM3Ha, setWaterConsumedM3Ha] = useState("");
+  const [harvestError, setHarvestError] = useState<string | null>(null);
 
   const handleIrrigationSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -41,10 +43,12 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
           setWeekStart("");
           setIrrigationMm("");
         },
-        onError: () => {
-          setIrrigationError(
-            "No se pudo guardar el riego. ¿Ya existe un registro para esa semana?",
-          );
+        onError: (error) => {
+          if (isAxiosError(error) && error.response?.status === 409) {
+            setIrrigationError("Ya existe un registro de riego para esa semana.");
+            return;
+          }
+          setIrrigationError("No se pudo guardar el riego. Inténtalo de nuevo.");
         },
       },
     );
@@ -52,6 +56,7 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
 
   const handleHarvestSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    setHarvestError(null);
     if (!harvestDate) return;
 
     createHarvest.mutate(
@@ -65,6 +70,13 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
           setHarvestDate("");
           setYieldKgHa("");
           setWaterConsumedM3Ha("");
+        },
+        onError: (error) => {
+          if (isAxiosError(error) && error.response?.status === 409) {
+            setHarvestError("Ya existe una cosecha registrada para esa fecha.");
+            return;
+          }
+          setHarvestError("No se pudo guardar la cosecha. Inténtalo de nuevo.");
         },
       },
     );
@@ -198,6 +210,7 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
                 />
               </div>
             </div>
+            {harvestError && <p className="text-[11px] text-red-500">{harvestError}</p>}
             <button
               type="submit"
               disabled={createHarvest.isPending}
@@ -215,7 +228,7 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
             {harvests?.map((harvest) => (
               <div
                 key={harvest.id}
-                className="flex justify-between text-[11.5px] py-1.5 border-b border-[#f6f4ef] last:border-0"
+                className="flex justify-between items-baseline text-[11.5px] py-1.5 border-b border-[#f6f4ef] last:border-0"
               >
                 <span className="text-[#6b7a70]">
                   {new Date(harvest.harvest_date).toLocaleDateString("es-ES", {
@@ -224,8 +237,15 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
                     year: "numeric",
                   })}
                 </span>
-                <span className="font-semibold text-[#24302a]">
-                  {harvest.yield_kg_ha !== null ? `${harvest.yield_kg_ha} kg/ha` : "sin dato"}
+                <span className="text-right">
+                  <span className="font-semibold text-[#24302a]">
+                    {harvest.yield_kg_ha !== null ? `${harvest.yield_kg_ha} kg/ha` : "sin dato"}
+                  </span>
+                  {harvest.water_consumed_m3_ha !== null && (
+                    <span className="block text-[10px] text-[#9aa79d]">
+                      {harvest.water_consumed_m3_ha} m³/ha
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
