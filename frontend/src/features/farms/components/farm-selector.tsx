@@ -1,17 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useFarms } from "../api/get-farms";
 import { FarmGrid } from "./farm-grid";
 import { useAuthStore } from "@/features/auth/stores/auth";
+import { useFarmStore } from "../stores/farm";
 
 export function FarmSelector() {
   const { data: farms, isLoading, isError } = useFarms();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const selectFarm = useFarmStore((state) => state.selectFarm);
+  const router = useRouter();
 
-  if (isLoading) {
+  // Skip the picker entirely when the user only has one farm
+  useEffect(() => {
+    if (farms && farms.length === 1) {
+      selectFarm(farms[0]);
+      router.push("/");
+    }
+  }, [farms, selectFarm, router]);
+
+  if (isLoading || (farms && farms.length === 1)) {
     return (
-      <div className="min-h-screen bg-[#eef0e8] flex items-center justify-center">
+      <div className="h-screen bg-[#eef0e8] flex items-center justify-center">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 rounded-full border-4 border-[#2f5d3f] border-t-transparent animate-spin mx-auto" />
           <p className="text-xs text-[#6b7a70]">Cargando explotaciones...</p>
@@ -22,7 +35,7 @@ export function FarmSelector() {
 
   if (isError) {
     return (
-      <div className="min-h-screen bg-[#eef0e8] flex items-center justify-center p-4">
+      <div className="h-screen bg-[#eef0e8] flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-white p-6 rounded-2xl border border-red-100 text-center space-y-4 shadow-sm">
           <div className="text-red-500 font-bold text-lg">Error de carga</div>
           <p className="text-xs text-[#6b7a70]">
@@ -40,9 +53,9 @@ export function FarmSelector() {
   }
 
   return (
-    <div className="min-h-screen bg-[#eef0e8] flex flex-col font-sans">
+    <div className="h-screen overflow-hidden bg-[#eef0e8] flex flex-col font-sans">
       {/* Top Bar for Select screen */}
-      <header className="h-16 bg-white border-b border-[#d9d3c5]/60 flex items-center justify-between px-6 md:px-12">
+      <header className="h-16 shrink-0 bg-white border-b border-[#d9d3c5]/60 flex items-center justify-between px-6 md:px-12">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-[#2f5d3f] flex items-center justify-center">
             <svg
@@ -76,8 +89,10 @@ export function FarmSelector() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-6 md:px-12 py-10">
-        <FarmGrid farms={farms || []} />
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl w-full mx-auto px-6 md:px-12 py-10">
+          <FarmGrid farms={farms || []} />
+        </div>
       </main>
     </div>
   );

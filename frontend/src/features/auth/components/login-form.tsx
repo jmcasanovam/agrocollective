@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
 
 import { useLogin } from "../api/login";
 import { useRegister } from "../api/register";
@@ -24,7 +23,10 @@ type AuthFormData = z.infer<typeof registerSchema>;
 export function LoginForm() {
   const [isLoginView, setIsLoginView] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const router = useRouter();
+  // Stays true after a successful login until AppLayout finishes resolving
+  // where to navigate (it owns that decision) — avoids the submit button
+  // flickering back to its idle state during that final gap.
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const loginMutation = useLogin();
   const registerMutation = useRegister();
@@ -46,9 +48,7 @@ export function LoginForm() {
     setErrorMessage(null);
     if (isLoginView) {
       loginMutation.mutate(data, {
-        onSuccess: () => {
-          router.push("/farms");
-        },
+        onSuccess: () => setIsRedirecting(true),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (err: any) => {
           const isUnauthorized = err.response?.status === 401;
@@ -63,9 +63,7 @@ export function LoginForm() {
         onSuccess: () => {
           // Auto login after registration
           loginMutation.mutate(data, {
-            onSuccess: () => {
-              router.push("/farms");
-            },
+            onSuccess: () => setIsRedirecting(true),
             onError: () => {
               // Redirect to login if autologin fails
               setIsLoginView(true);
@@ -88,7 +86,7 @@ export function LoginForm() {
     reset();
   };
 
-  const isLoading = loginMutation.isPending || registerMutation.isPending;
+  const isLoading = loginMutation.isPending || registerMutation.isPending || isRedirecting;
 
   return (
     <div>

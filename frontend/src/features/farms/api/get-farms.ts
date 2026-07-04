@@ -4,7 +4,7 @@ import type { Farm } from "../types";
 import { useFarmStore } from "../stores/farm";
 import { useEffect } from "react";
 
-export function useFarms() {
+export function useFarms(enabled: boolean = true) {
   const initSelectedFarm = useFarmStore((state) => state.initSelectedFarm);
 
   const query = useQuery({
@@ -13,6 +13,7 @@ export function useFarms() {
       const { data } = await apiClient.get<Farm[]>("/farms");
       return data;
     },
+    enabled,
   });
 
   useEffect(() => {
