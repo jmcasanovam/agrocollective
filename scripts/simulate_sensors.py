@@ -81,7 +81,10 @@ PROFILE_FALLBACK = [
     for i in range(100)
 ]
 
-BATTERY_RANGE = (3400, 4100)
+# Rango de tensión de batería (mismo mapeo 0-100% que usa el frontend:
+# 3300mV = 0%, 4200mV = 100%). Ver device-status-card.tsx.
+BATTERY_MV_MIN = 3300
+BATTERY_MV_MAX = 4200
 
 # =============================================================================
 # Helpers BD (docker exec → psql, mismo patrón que setup_simulation.py)
@@ -352,6 +355,8 @@ class SensorSimulator:
         self._dry  = soil["dry"]  # factor de secado por ETo
         self._sh   = self._wp + (self._fc - self._wp) * 0.75  # nivel inicial: 75% del agua disponible
         self._last_day: date | None = None
+        self._battery_pct: float = 100.0
+        self._battery_ts: datetime | None = None
 
     def _step_water_balance(self, day: date, w: dict) -> None:
         """Balance hídrico diario: llamar una vez por día antes de generar lecturas."""
@@ -382,6 +387,19 @@ class SensorSimulator:
             self._sh = max(self._wp, min(self._fc + 3.0, self._sh + delta))
         else:
             self._sh = max(self._wp, min(self._fc, self._sh + delta))
+
+    def _step_battery(self, ts: datetime) -> int:
+        """Descarga lineal de 1%/hora desde la última lectura; al agotarse se
+        considera reemplazada/recargada (vuelve a 100%), simulando el cambio
+        físico de batería de un nodo real."""
+        elapsed_hours = 0.0 if self._battery_ts is None else max(
+            0.0, (ts - self._battery_ts).total_seconds() / 3600
+        )
+        self._battery_ts = ts
+        self._battery_pct = (self._battery_pct - elapsed_hours) % 100
+
+        mv_range = BATTERY_MV_MAX - BATTERY_MV_MIN
+        return round(BATTERY_MV_MIN + (self._battery_pct / 100) * mv_range)
 
     def next_reading(self, ts: datetime, day_weather: dict) -> dict:
         day = ts.date()
@@ -433,7 +451,7 @@ class SensorSimulator:
             # Parcela 5: Anomalía de humedad del aire (ej. sensor descalibrado, lectura baja)
             air_hum = round(max(10.0, air_hum - 20.0), 2)
 
-        battery = int(random.uniform(*BATTERY_RANGE))
+        battery = self._step_battery(ts)
 
         return {
             "device_id":  self.device_code,
