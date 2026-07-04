@@ -43,7 +43,7 @@ export function PlotCard({ plot }: PlotCardProps) {
   return (
     <Link
       href={`/plots/${plot.id}`}
-      className="bg-white border border-[#e7e2d6] rounded-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-[18px_20px] flex items-center gap-5 no-underline hover:border-[#bcd3b6] hover:shadow-[0_6px_16px_rgba(47,93,63,0.09)] transition-all cursor-pointer"
+      className="bg-white border border-[#e7e2d6] rounded-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-4 sm:p-[18px_20px] flex flex-wrap items-center gap-4 sm:gap-5 no-underline hover:border-[#bcd3b6] hover:shadow-[0_6px_16px_rgba(47,93,63,0.09)] transition-all cursor-pointer"
     >
       {/* Icon */}
       <div
@@ -67,7 +67,7 @@ export function PlotCard({ plot }: PlotCardProps) {
       </div>
 
       {/* Name + meta */}
-      <div className="min-w-[180px]">
+      <div className="min-w-[140px] flex-1 basis-[140px]">
         <div className="text-[15.5px] font-bold text-[#24302a]">{plot.name}</div>
         <div className="text-xs text-[#8a978d]">
           {crop?.name ?? "no hay datos"} · {soil?.name ?? "no hay datos"} ·{" "}
@@ -76,7 +76,7 @@ export function PlotCard({ plot }: PlotCardProps) {
       </div>
 
       {/* Middle data columns */}
-      <div className="flex gap-[26px] ml-2">
+      <div className="flex gap-5 sm:gap-[26px] sm:ml-2">
         <div>
           <div className="text-[11px] text-[#9aa79d]">Perfil de riego</div>
           <div className="text-[13px] font-semibold text-[#3a4a42]">

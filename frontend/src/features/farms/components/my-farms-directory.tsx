@@ -1,15 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useFarms } from "../api/get-farms";
 import { usePlots } from "@/features/plots/api/get-plots";
 import { useDevice } from "@/features/devices/api/get-device";
 import { useCrops, useSoils } from "@/features/plots/api/get-catalog";
 import { useRegions } from "../api/get-regions";
+import { FarmFormModal } from "./farm-form-modal";
 import type { Plot } from "@/features/plots/types";
 
 export function MyFarmsDirectory() {
   const { data: farms, isLoading, isError } = useFarms();
   const { data: regions } = useRegions();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -30,14 +33,29 @@ export function MyFarmsDirectory() {
 
   return (
     <div className="space-y-8 max-w-[1120px] mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-[#24302a] tracking-tight mb-1">
-          Directorio de Fincas
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-bold text-[#24302a] tracking-tight m-0">
+          Directorio de fincas
         </h1>
-        <p className="text-sm text-[#6b7a70] m-0">
-          Vista general de todas tus explotaciones, parcelas vinculadas y estado de los dispositivos
-          IoT.
-        </p>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="h-10 px-4 border-none rounded-lg bg-[#2f5d3f] text-white text-xs font-semibold cursor-pointer hover:bg-[#264b33] transition-colors flex items-center gap-1.5"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
+          </svg>
+          Nueva finca
+        </button>
       </div>
 
       <div className="space-y-6">
@@ -69,6 +87,8 @@ export function MyFarmsDirectory() {
           );
         })}
       </div>
+
+      <FarmFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

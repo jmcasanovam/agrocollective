@@ -44,15 +44,10 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
   return (
     <div className="max-w-[1120px] mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#24302a] tracking-tight m-0 mb-1">
-            Parcelas de {selectedFarm.name}
-          </h1>
-          <p className="text-sm text-[#6b7a70] m-0">
-            Cada parcela tiene un nodo ESP32 y su propio análisis agronómico.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-bold text-[#24302a] tracking-tight m-0">
+          Parcelas de {selectedFarm.name}
+        </h1>
         <button
           onClick={() => setIsModalOpen(true)}
           className="h-10 px-4 border-none rounded-[9px] bg-[#2f5d3f] text-white text-sm font-semibold cursor-pointer hover:bg-[#264b33] transition-colors inline-flex items-center gap-2"

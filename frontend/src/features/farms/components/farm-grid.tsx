@@ -23,13 +23,8 @@ export function FarmGrid({ farms }: FarmGridProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold text-[#24302a]">Mis Fincas</h2>
-          <p className="text-xs text-[#6b7a70]">
-            Selecciona o añade una explotación agrícola para gestionarla
-          </p>
-        </div>
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <h2 className="text-xl font-bold text-[#24302a]">Mis fincas</h2>
         <button
           onClick={() => setIsModalOpen(true)}
           className="h-10 px-4 border-none rounded-lg bg-[#2f5d3f] text-white text-xs font-semibold cursor-pointer hover:bg-[#264b33] transition-colors flex items-center gap-1.5"
