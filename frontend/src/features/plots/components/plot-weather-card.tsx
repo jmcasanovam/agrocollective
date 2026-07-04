@@ -1,19 +1,83 @@
 "use client";
 
-import { usePlotWeather } from "../api/get-plot-weather";
+import { useState } from "react";
+import { usePlotWeather, type WeatherRecord } from "../api/get-plot-weather";
+import { CloudSunIcon } from "@/components/icons/card-icons";
+import { AlertPopup } from "@/components/ui/alert-popup";
 
 interface PlotWeatherCardProps {
   plotId: string;
 }
 
-export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
-  const { data: weather, isLoading, isError } = usePlotWeather(plotId);
+const MAX_TODAY_ATTEMPTS = 5;
+const RETRY_INTERVAL_MS = 5000;
 
-  if (isLoading) {
+function todayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function hasTodayRecord(weather: WeatherRecord[] | null | undefined) {
+  if (!weather) return false;
+  const today = todayStr();
+  return weather.some((row) => row.date === today);
+}
+
+export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
+  const [dismissed, setDismissed] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [lastCountedUpdate, setLastCountedUpdate] = useState(0);
+
+  const {
+    data: weather,
+    isLoading,
+    isError,
+    dataUpdatedAt,
+  } = usePlotWeather(plotId, {
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (hasTodayRecord(data)) return false;
+      if (attempts >= MAX_TODAY_ATTEMPTS) return false;
+      return RETRY_INTERVAL_MS;
+    },
+  });
+
+  const gotToday = hasTodayRecord(weather);
+
+  // Count each resolved fetch that still doesn't carry today's record, so
+  // polling gives up after MAX_TODAY_ATTEMPTS instead of retrying forever.
+  // Adjusting state during render (not an effect) mirrors "adjusting state
+  // when a prop changes" from the React docs: it's idempotent per render
+  // since the condition clears itself once lastCountedUpdate catches up.
+  if (dataUpdatedAt && dataUpdatedAt !== lastCountedUpdate) {
+    setLastCountedUpdate(dataUpdatedAt);
+    if (!gotToday) setAttempts((a) => a + 1);
+  }
+
+  const exhaustedRetries = attempts >= MAX_TODAY_ATTEMPTS;
+  const showStalePopup = !dismissed && !!weather && !gotToday && exhaustedRetries;
+
+  const stalePopup = showStalePopup && (
+    <AlertPopup
+      title="Datos climáticos de hoy no disponibles"
+      message="No se han podido obtener los registros de la estación SiAR correspondientes al día de hoy. Se muestran los últimos datos disponibles."
+      onClose={() => setDismissed(true)}
+    />
+  );
+
+  const waitingForToday = !isLoading && !isError && weather && !gotToday && !exhaustedRetries;
+
+  if (isLoading || waitingForToday) {
     return (
       <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 text-center">
         <div className="w-6 h-6 rounded-full border-[3px] border-[#2f5d3f] border-t-transparent animate-spin mx-auto mb-2" />
-        <p className="text-xs text-[#6b7a70]">Cargando datos climáticos de la estación...</p>
+        <p className="text-xs text-[#6b7a70]">
+          {waitingForToday
+            ? "Esperando los datos climáticos de hoy de la estación SiAR..."
+            : "Cargando datos climáticos de la estación..."}
+        </p>
       </div>
     );
   }
@@ -28,9 +92,12 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
 
   if (weather.length === 0) {
     return (
-      <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 text-center text-xs text-[#6b7a70]">
-        No hay registros climáticos disponibles para este sector.
-      </div>
+      <>
+        {stalePopup}
+        <div className="p-6 bg-white rounded-2xl border border-[#d9d3c5]/60 text-center text-xs text-[#6b7a70]">
+          No hay registros climáticos disponibles para este sector.
+        </div>
+      </>
     );
   }
 
@@ -38,16 +105,14 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
 
   return (
     <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 space-y-4">
+      {stalePopup}
       {/* Header */}
       <div className="flex justify-between items-center border-b border-[#f0ece2] pb-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🌤️</span>
-          <div>
-            <h3 className="text-sm font-bold text-[#24302a] m-0">
-              Registros Climáticos Diario (SiAR)
-            </h3>
-            <p className="text-[11.5px] text-[#6b7a70] m-0">Estación meteorológica de referencia</p>
-          </div>
+          <CloudSunIcon className="w-[18px] h-[18px] text-[#3a4a42]" />
+          <h3 className="text-sm font-bold text-[#24302a] m-0">
+            Registros climáticos diario (SiAR)
+          </h3>
         </div>
         <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-[#f4f2eb] text-[#3a4a42]">
           Estación: {stationCode}

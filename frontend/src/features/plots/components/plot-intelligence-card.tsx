@@ -7,6 +7,14 @@ import { useAnalogues } from "../api/get-analogues";
 import { useMlPredictions } from "../api/get-ml-predictions";
 import { usePerformanceHistory } from "../api/get-performance-history";
 import { buildLinePath } from "@/lib/svg-line";
+import {
+  BrainIcon,
+  LightbulbIcon,
+  AlertTriangleIcon,
+  LinkIcon,
+  BotIcon,
+  TrendingUpIcon,
+} from "@/components/icons/card-icons";
 import type { RecommendationPriority } from "../types";
 
 interface PlotIntelligenceCardProps {
@@ -15,12 +23,16 @@ interface PlotIntelligenceCardProps {
 
 type Tab = "recommendations" | "anomalies" | "analogues" | "predictions" | "history";
 
-const TABS: { key: Tab; label: string; icon: string }[] = [
-  { key: "recommendations", label: "Recomendaciones", icon: "💡" },
-  { key: "anomalies", label: "Anomalías", icon: "⚠️" },
-  { key: "analogues", label: "Parcelas análogas", icon: "🔗" },
-  { key: "predictions", label: "Predicción ML", icon: "🤖" },
-  { key: "history", label: "Evolución", icon: "📈" },
+const TABS: {
+  key: Tab;
+  label: string;
+  icon: (props: { className?: string }) => React.JSX.Element;
+}[] = [
+  { key: "recommendations", label: "Recomendaciones", icon: LightbulbIcon },
+  { key: "anomalies", label: "Anomalías", icon: AlertTriangleIcon },
+  { key: "analogues", label: "Parcelas análogas", icon: LinkIcon },
+  { key: "predictions", label: "Predicción ML", icon: BotIcon },
+  { key: "history", label: "Evolución", icon: TrendingUpIcon },
 ];
 
 const PRIORITY_RANK: Record<RecommendationPriority, number> = { high: 0, medium: 1, low: 2 };
@@ -54,29 +66,28 @@ export function PlotIntelligenceCard({ plotId }: PlotIntelligenceCardProps) {
   return (
     <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 space-y-5">
       <div className="flex items-center gap-2 border-b border-[#f0ece2] pb-3">
-        <span className="text-lg">🧠</span>
-        <div>
-          <h3 className="text-sm font-bold text-[#24302a] m-0">Inteligencia colectiva</h3>
-          <p className="text-[11.5px] text-[#6b7a70] m-0">
-            Resultados del pipeline de análisis agronómico nocturno
-          </p>
-        </div>
+        <BrainIcon className="w-[18px] h-[18px] text-[#3a4a42]" />
+        <h3 className="text-sm font-bold text-[#24302a] m-0">Inteligencia colectiva</h3>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-full text-[11.5px] font-semibold transition-colors ${
-              tab === t.key
-                ? "bg-[#2f5d3f] text-white"
-                : "bg-[#f4f2eb] text-[#6b7a70] hover:bg-[#eae7db]"
-            }`}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11.5px] font-semibold transition-colors ${
+                tab === t.key
+                  ? "bg-[#2f5d3f] text-white"
+                  : "bg-[#f4f2eb] text-[#6b7a70] hover:bg-[#eae7db]"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "recommendations" && (

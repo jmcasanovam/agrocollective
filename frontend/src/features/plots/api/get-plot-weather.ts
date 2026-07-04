@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type Query } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 
 export interface WeatherRecord {
@@ -15,7 +15,12 @@ export interface WeatherRecord {
   precipitation: number | null;
 }
 
-export function usePlotWeather(plotId: string | null) {
+export function usePlotWeather(
+  plotId: string | null,
+  options?: {
+    refetchInterval?: number | false | ((query: Query<WeatherRecord[] | null>) => number | false);
+  },
+) {
   return useQuery({
     queryKey: ["plots", plotId, "weather"],
     queryFn: async () => {
@@ -24,5 +29,6 @@ export function usePlotWeather(plotId: string | null) {
       return data;
     },
     enabled: !!plotId,
+    refetchInterval: options?.refetchInterval ?? false,
   });
 }

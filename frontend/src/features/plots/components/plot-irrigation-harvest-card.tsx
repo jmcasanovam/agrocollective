@@ -5,6 +5,7 @@ import { useIrrigation } from "../api/get-irrigation";
 import { useCreateIrrigation } from "../api/create-irrigation";
 import { useHarvests } from "../api/get-harvests";
 import { useCreateHarvest } from "../api/create-harvest";
+import { SproutIcon } from "@/components/icons/card-icons";
 
 interface PlotIrrigationHarvestCardProps {
   plotId: string;
@@ -72,13 +73,8 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
   return (
     <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 space-y-6">
       <div className="flex items-center gap-2 border-b border-[#f0ece2] pb-3">
-        <span className="text-lg">🌾</span>
-        <div>
-          <h3 className="text-sm font-bold text-[#24302a] m-0">Riego y cosechas</h3>
-          <p className="text-[11.5px] text-[#6b7a70] m-0">
-            Registros manuales que alimentan el modelo de predicción
-          </p>
-        </div>
+        <SproutIcon className="w-[18px] h-[18px] text-[#3a4a42]" />
+        <h3 className="text-sm font-bold text-[#24302a] m-0">Riego y cosechas</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -88,37 +84,39 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
             Riego semanal
           </h4>
           <form onSubmit={handleIrrigationSubmit} className="space-y-2">
-            <div>
-              <label
-                htmlFor="irrigation-week-start"
-                className="block text-[11px] text-[#6b7a70] mb-1"
-              >
-                Semana (inicio)
-              </label>
-              <input
-                id="irrigation-week-start"
-                type="date"
-                value={weekStart}
-                onChange={(e) => setWeekStart(e.target.value)}
-                className={inputClass}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="irrigation-mm" className="block text-[11px] text-[#6b7a70] mb-1">
-                Volumen (mm)
-              </label>
-              <input
-                id="irrigation-mm"
-                type="number"
-                step="0.1"
-                min="0.1"
-                placeholder="12.5"
-                value={irrigationMm}
-                onChange={(e) => setIrrigationMm(e.target.value)}
-                className={inputClass}
-                required
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <label
+                  htmlFor="irrigation-week-start"
+                  className="block text-[11px] text-[#6b7a70] mb-1"
+                >
+                  Semana (inicio)
+                </label>
+                <input
+                  id="irrigation-week-start"
+                  type="date"
+                  value={weekStart}
+                  onChange={(e) => setWeekStart(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="irrigation-mm" className="block text-[11px] text-[#6b7a70] mb-1">
+                  Volumen (mm)
+                </label>
+                <input
+                  id="irrigation-mm"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  placeholder="12.5"
+                  value={irrigationMm}
+                  onChange={(e) => setIrrigationMm(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </div>
             </div>
             {irrigationError && <p className="text-[11px] text-red-500">{irrigationError}</p>}
             <button
@@ -157,20 +155,20 @@ export function PlotIrrigationHarvestCard({ plotId }: PlotIrrigationHarvestCardP
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-[#3a4a42] uppercase tracking-wide">Cosecha</h4>
           <form onSubmit={handleHarvestSubmit} className="space-y-2">
-            <div>
-              <label htmlFor="harvest-date" className="block text-[11px] text-[#6b7a70] mb-1">
-                Fecha de cosecha
-              </label>
-              <input
-                id="harvest-date"
-                type="date"
-                value={harvestDate}
-                onChange={(e) => setHarvestDate(e.target.value)}
-                className={inputClass}
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <label htmlFor="harvest-date" className="block text-[11px] text-[#6b7a70] mb-1">
+                  Fecha de cosecha
+                </label>
+                <input
+                  id="harvest-date"
+                  type="date"
+                  value={harvestDate}
+                  onChange={(e) => setHarvestDate(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </div>
               <div>
                 <label htmlFor="harvest-yield" className="block text-[11px] text-[#6b7a70] mb-1">
                   Rendimiento (kg/ha)
