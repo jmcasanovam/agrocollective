@@ -26,3 +26,30 @@ export function buildLinePath(
   });
   return path.trim();
 }
+
+// Mismas coordenadas que buildLinePath, expuestas como puntos individuales
+// para poder dibujar marcadores (círculos) sobre cada lectura real.
+export function buildLinePoints(
+  values: (number | null)[],
+  width: number,
+  height: number,
+  padding = 4,
+): { x: number; y: number }[] {
+  const valid = values.filter((v): v is number => v !== null);
+  if (valid.length < 2) return [];
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+  const step = values.length > 1 ? (width - padding * 2) / (values.length - 1) : 0;
+
+  const points: { x: number; y: number }[] = [];
+  values.forEach((v, i) => {
+    if (v === null) return;
+    points.push({
+      x: padding + i * step,
+      y: height - padding - ((v - min) / range) * (height - padding * 2),
+    });
+  });
+  return points;
+}
