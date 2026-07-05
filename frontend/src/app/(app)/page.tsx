@@ -11,9 +11,20 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function deltaPct(actual: number | null, predicted: number | null): number | null {
-  if (actual === null || predicted === null || predicted === 0) return null;
-  return ((actual - predicted) / predicted) * 100;
+// Promedio del % de desviación DE CADA PARCELA respecto a su propia
+// referencia de la red, en vez de comparar el promedio-de-actuales contra el
+// promedio-de-referencias. Con cultivos distintos en la misma finca (p.ej.
+// viña ~8500 kg/ha vs almendro ~1600 kg/ha) la segunda forma queda sesgada
+// por la mezcla: una finca con más parcelas del cultivo de menor rendimiento
+// sale peor aunque cada parcela individual esté en línea con lo esperado
+// para SU cultivo. Promediar la desviación parcela a parcela elimina ese
+// sesgo de composición.
+function averageDeviationPct(pairs: { actual: number; predicted: number }[]): number | null {
+  const deviations = pairs
+    .filter((p) => p.predicted !== 0)
+    .map((p) => ((p.actual - p.predicted) / p.predicted) * 100);
+  if (deviations.length === 0) return null;
+  return deviations.reduce((sum, d) => sum + d, 0) / deviations.length;
 }
 
 function formatDate(isoDate: string): string {
@@ -61,7 +72,9 @@ export default function DashboardPage() {
   );
   const avgYield = average(yieldEntries.map((e) => e.yield_kg_ha));
   const avgPredictedYield = average(yieldEntries.map((e) => e.predicted_yield));
-  const yieldDelta = deltaPct(avgYield, avgPredictedYield);
+  const yieldDelta = averageDeviationPct(
+    yieldEntries.map((e) => ({ actual: e.yield_kg_ha, predicted: e.predicted_yield })),
+  );
 
   // Water efficiency vs network
   const waterEntries = entries.filter(
@@ -72,7 +85,9 @@ export default function DashboardPage() {
   );
   const avgEfficiency = average(waterEntries.map((e) => e.water_efficiency));
   const avgPredictedEfficiency = average(waterEntries.map((e) => e.predicted_efficiency));
-  const efficiencyDelta = deltaPct(avgEfficiency, avgPredictedEfficiency);
+  const efficiencyDelta = averageDeviationPct(
+    waterEntries.map((e) => ({ actual: e.water_efficiency, predicted: e.predicted_efficiency })),
+  );
   const totalWaterMm = entries.reduce((sum, e) => sum + (e.total_water_mm ?? 0), 0);
 
   // Alerts
@@ -87,7 +102,7 @@ export default function DashboardPage() {
         <div className="text-lg text-[#5c6b62]">
           Finca seleccionada:{" "}
           <span className="font-bold text-[#24302a] tracking-tight">
-            {selectedFarm?.name ?? "—"}
+            {selectedFarm?.name ?? "N/D"}
           </span>
         </div>
         <div className="inline-flex items-center gap-[7px] h-8 px-3.5 bg-[#eef3ea] border border-[#d8e4d3] rounded-full text-xs font-semibold text-[#35663f]">
@@ -164,6 +179,27 @@ export default function DashboardPage() {
               <path d="m7 12 3-3 3 3 5-5" />
             </svg>
             <h2 className="text-[15px] font-bold text-[#24302a] m-0">Rendimiento vs. red</h2>
+            <span className="relative group inline-flex cursor-help">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9aa79d"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+              <span className="pointer-events-none absolute top-full left-0 mt-2 w-64 rounded-lg bg-[#24302a] text-white text-[10.5px] font-normal leading-snug p-2.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-30">
+                Se compara cada parcela contra su propia referencia de la red y luego se promedian
+                esos porcentajes, así una finca con cultivos de menor rendimiento por naturaleza (p.
+                ej. almendro frente a viña) no sale peor solo por su mezcla de cultivos.
+              </span>
+            </span>
           </div>
           <p className="text-xs text-[#8a978d] m-0 mb-4 min-h-8">
             Producción media vs. lo esperado por el modelo de la red.
