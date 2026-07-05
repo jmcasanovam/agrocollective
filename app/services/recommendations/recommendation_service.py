@@ -5,9 +5,9 @@ Sintetiza los resultados de las fases anteriores para producir recomendaciones
 accionables por parcela, clasificadas por categoría y prioridad.
 
 Categorías:
-  anomaly    — parcela anómala con causa probable identificada (Fases 5+6)
-  prediction — brecha entre valor observado y predicción ML (Fase 8)
-  benchmark  — la parcela está por debajo de la media de su cluster (Fase 4)
+  anomaly:    parcela anómala con causa probable identificada (Fases 5+6)
+  prediction: brecha entre valor observado y predicción ML (Fase 8)
+  benchmark:  la parcela está por debajo de la media de su cluster (Fase 4)
 
 Prioridad:
   high   → anomalía con causa clara, o brecha de rendimiento > 30 %
@@ -16,7 +16,6 @@ Prioridad:
 """
 
 import logging
-import math
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -48,6 +47,36 @@ _FEATURE_LABELS: dict[str, str] = {
     "water_efficiency":     "eficiencia hídrica",
     "irrigation_mm":        "volumen de riego",
 }
+
+# Medida concreta a aplicar segun la feature anomala y el sentido de la
+# desviacion ("alto"/"bajo" respecto al resto del cluster). Redactado para un
+# productor sin formacion tecnica: que hacer, no solo que se ha detectado.
+#
+# Solo cubre variables de sensor (lof_service.SENSOR_FEATURE_COLUMNS): riego y
+# rendimiento los introduce el propio agricultor a mano, asi que una
+# desviacion ahi no es una anomalia de sensor, es una diferencia de manejo:
+# esa comparacion ya la hacen las recomendaciones de categoria "benchmark".
+_ACTIONS_BY_FEATURE: dict[str, dict[str, str]] = {
+    "avg_soil_humidity": {
+        "bajo": "Riega antes de lo habitual: el suelo está más seco de lo normal para una parcela como la tuya.",
+        "alto": "Reduce o retrasa el próximo riego: el suelo está más húmedo de lo normal, hay riesgo de encharcamiento.",
+    },
+    "avg_air_temp": {
+        "alto": "Vigila el estrés por calor: valora sombreo o un riego de refresco en las horas centrales del día.",
+        "bajo": "Vigila el riesgo de frío: protege el cultivo si las temperaturas siguen bajas los próximos días.",
+    },
+    "avg_soil_temp": {
+        "alto": "El suelo está más caliente de lo habitual: si puedes, riega en horas frescas para amortiguarlo.",
+        "bajo": "El suelo está más frío de lo habitual: puede ralentizar la absorción de agua y nutrientes.",
+    },
+    "avg_air_humidity": {
+        "alto": "Vigila el riesgo de hongos y plagas: la humedad ambiental es más alta de lo normal.",
+        "bajo": "Ambiente más seco de lo normal: vigila el estrés hídrico en las horas de más calor.",
+    },
+}
+
+_URGENT_LEAD = "Actúa esta semana."
+_SOON_LEAD = "No es urgente, pero revísalo en los próximos días."
 
 
 @dataclass
@@ -134,27 +163,24 @@ class RecommendationService:
         for feature in anomaly.anomalous_features:
             label = _FEATURE_LABELS.get(feature, feature)
             causal = causal_map.get(feature)
+            direction = anomaly.feature_directions.get(feature)
+            action = _ACTIONS_BY_FEATURE.get(feature, {}).get(
+                direction or "", "Revisa esta parcela: se desvía de lo habitual en tu grupo."
+            )
+            direction_word = "por encima" if direction == "alto" else "por debajo"
 
             if causal and causal.causal_feature and causal.explanation:
                 cause_label = _FEATURE_LABELS.get(causal.causal_feature, causal.causal_feature)
-                title = f"Anomalía en {label}: posible {cause_label} inadecuado/a"
+                title = f"{label.capitalize()} {direction_word} de lo normal, causa probable: {cause_label}"
                 body = (
-                    f"Tu parcela presenta un valor anómalo de {label} "
-                    f"(LOF score: {anomaly.lof_score:.2f}). "
-                    f"{causal.explanation} "
-                    f"Correlación estadística: {causal.correlation:+.2f}. "
-                    f"Revisa los registros de {cause_label} de las últimas semanas."
+                    f"{_URGENT_LEAD} {action} "
+                    f"Motivo probable: {causal.explanation} "
+                    f"(relación con {cause_label}: {causal.correlation:+.2f} sobre 1)."
                 )
                 priority = "high"
             else:
-                title = f"Anomalía detectada en {label}"
-                body = (
-                    f"Tu parcela presenta un valor estadísticamente inusual de {label} "
-                    f"respecto al resto de parcelas de su grupo "
-                    f"(LOF score: {anomaly.lof_score:.2f}). "
-                    f"No se ha podido determinar la causa automáticamente. "
-                    f"Se recomienda revisar el estado del sensor y los registros de campo."
-                )
+                title = f"{label.capitalize()} {direction_word} de lo normal en esta parcela"
+                body = f"{_SOON_LEAD} {action} Revisa también que el sensor esté funcionando bien."
                 priority = "medium"
 
             recs.append(RecommendationResult(
@@ -205,16 +231,13 @@ class RecommendationService:
                 continue
 
             pct = round(gap * 100, 1)
-            r2 = pred.model_r2
-            r2_str = f"{r2:.2f}" if r2 is not None and not math.isnan(r2) else "N/A"
-            title = f"Tu {label} está un {pct}% por debajo del potencial estimado"
+            lead = _URGENT_LEAD if priority == "high" else _SOON_LEAD
+            title = f"Tu {label} tiene margen de mejora ({pct}% por debajo de lo esperado)"
             body = (
-                f"El modelo de predicción estima que parcelas con tus condiciones "
-                f"alcanzan un {label} de {predicted:.2f}, pero tu valor actual es {observed:.2f} "
-                f"({pct}% de diferencia). "
-                f"Compara tus prácticas con las parcelas análogas de tu grupo "
-                f"para identificar oportunidades de mejora. "
-                f"(R² del modelo: {r2_str}, entrenado con {pred.n_training_samples} parcelas)"
+                f"{lead} Parcelas con condiciones de suelo y riego parecidas a la tuya suelen lograr "
+                f"un {label} de {predicted:.2f}, y la tuya está en {observed:.2f} ({pct}% menos). "
+                f"Revisa la sección \"Parcelas análogas\" de esta parcela para ver con qué manejo "
+                f"lo consiguen y qué podrías replicar."
             )
 
             recs.append(RecommendationResult(
@@ -241,42 +264,53 @@ class RecommendationService:
     ) -> list[RecommendationResult]:
         recs = []
 
+        # direction="bajo" dispara cuando observado < media del grupo (mal para
+        # eficiencia/humedad); direction="alto" dispara cuando observado > media
+        # (mal para volumen de riego: regar de más no es "mejor", es ineficiente).
         checks = [
             (
                 agg.water_efficiency,
                 cluster_info.cluster_avg_efficiency,
                 "eficiencia hídrica",
-                "Optimiza el calendario y volumen de riego para reducir el agua aplicada por kg de cosecha.",
+                "bajo",
+                "Produces menos por cada litro de agua que otras parcelas parecidas. Revisa si hay pérdidas de agua (fugas, evaporación, riego fuera de horas frescas) antes de aumentar el riego.",
             ),
             (
                 agg.avg_soil_humidity,
                 cluster_info.cluster_avg_soil_humidity,
                 "humedad del suelo",
-                "Revisa la programación de riegos para acercarte a los valores medios de tu grupo.",
+                "bajo",
+                "El suelo está más seco de lo habitual en tu grupo. Adelanta o intensifica ligeramente el próximo riego.",
             ),
             (
                 agg.avg_irrigation_mm,
                 cluster_info.cluster_avg_irrigation_mm,
                 "volumen de riego",
-                "Tu volumen de riego supera la media del grupo. Considera reducirlo para mejorar la eficiencia.",
+                "alto",
+                "Estás aplicando más agua por riego que otras parcelas parecidas sin que ello se traduzca en más producción. Reduce gradualmente la cantidad por riego y observa si el rendimiento se mantiene.",
             ),
         ]
 
-        for observed, cluster_avg, label, advice in checks:
+        for observed, cluster_avg, label, direction, advice in checks:
             if observed is None or cluster_avg is None or cluster_avg == 0:
                 continue
 
-            gap = (cluster_avg - observed) / abs(cluster_avg)
+            gap = (
+                (cluster_avg - observed) / abs(cluster_avg)
+                if direction == "bajo"
+                else (observed - cluster_avg) / abs(cluster_avg)
+            )
             if gap <= _GAP_MEDIUM_THRESHOLD:
                 continue
 
             priority = "high" if gap > _GAP_HIGH_THRESHOLD else "medium"
             pct = round(gap * 100, 1)
-            title = f"Tu {label} está un {pct}% por debajo de la media de tu grupo"
+            comparativo = "por debajo de" if direction == "bajo" else "por encima de"
+            lead = _URGENT_LEAD if priority == "high" else _SOON_LEAD
+            title = f"Tu {label} está un {pct}% {comparativo} otras parcelas parecidas"
             body = (
-                f"La media de {label} en tu cluster es {cluster_avg:.2f}, "
-                f"mientras que tu valor es {observed:.2f} ({pct}% de diferencia). "
-                f"{advice}"
+                f"{lead} La media de {label} en parcelas similares a la tuya es {cluster_avg:.2f}, "
+                f"la tuya es {observed:.2f} ({pct}% de diferencia). {advice}"
             )
 
             recs.append(RecommendationResult(
