@@ -1,5 +1,5 @@
 """
-Simulador de sensores IoT anclado al SiAR — AgroCollective (Sprint 2).
+Simulador de sensores IoT anclado al SiAR: AgroCollective (Sprint 2).
 
 Lee datos diarios de InfluxDB measurement 'weather' (precargados por
 download_siar.py) y genera telemetría coherente con el clima real de
@@ -355,7 +355,10 @@ class SensorSimulator:
         self._dry  = soil["dry"]  # factor de secado por ETo
         self._sh   = self._wp + (self._fc - self._wp) * 0.75  # nivel inicial: 75% del agua disponible
         self._last_day: date | None = None
-        self._battery_pct: float = 100.0
+        # Cada dispositivo arranca en un punto distinto de su ciclo de descarga
+        # (offset determinista por plot_index, 10-100%) en vez de todos a 100%,
+        # para que no decaigan en paralelo mostrando el mismo % en todo momento.
+        self._battery_pct: float = 100.0 - ((plot_index * 7) % 90)
         self._battery_ts: datetime | None = None
 
     def _step_water_balance(self, day: date, w: dict) -> None:
@@ -389,14 +392,17 @@ class SensorSimulator:
             self._sh = max(self._wp, min(self._fc, self._sh + delta))
 
     def _step_battery(self, ts: datetime) -> int:
-        """Descarga lineal de 1%/hora desde la última lectura; al agotarse se
-        considera reemplazada/recargada (vuelve a 100%), simulando el cambio
-        físico de batería de un nodo real."""
+        """Descarga lineal de 1%/hora desde la última lectura; al llegar al
+        10% se considera reemplazada/recargada y vuelve al 100% de golpe,
+        simulando el cambio físico de batería de un nodo real (no es un
+        envolvente continuo por los valores bajos)."""
         elapsed_hours = 0.0 if self._battery_ts is None else max(
             0.0, (ts - self._battery_ts).total_seconds() / 3600
         )
         self._battery_ts = ts
-        self._battery_pct = (self._battery_pct - elapsed_hours) % 100
+        self._battery_pct -= elapsed_hours
+        if self._battery_pct <= 10:
+            self._battery_pct = 100.0
 
         mv_range = BATTERY_MV_MAX - BATTERY_MV_MIN
         return round(BATTERY_MV_MIN + (self._battery_pct / 100) * mv_range)
@@ -406,7 +412,7 @@ class SensorSimulator:
         self._step_water_balance(day, day_weather)
         hour = ts.hour
 
-        # Temperatura del aire — curva sinusoidal anclada a max/min del día
+        # Temperatura del aire: curva sinusoidal anclada a max/min del día
         t_mean = day_weather.get("air_temp", 20.0)
         t_max  = day_weather.get("air_temp_max",  t_mean + 5.0)
         t_min  = day_weather.get("air_temp_min",  t_mean - 5.0)
@@ -414,7 +420,7 @@ class SensorSimulator:
             _diurnal_temp(hour, t_min, t_max) + random.gauss(0, 0.3), 2
         )
 
-        # Humedad del aire — anti-fase, anclada a max/min del día
+        # Humedad del aire: anti-fase, anclada a max/min del día
         h_mean = day_weather.get("relative_humidity", 60.0)
         h_max  = day_weather.get("relative_humidity_max", min(100.0, h_mean + 10.0))
         h_min  = day_weather.get("relative_humidity_min", max(10.0,  h_mean - 10.0))
@@ -424,7 +430,7 @@ class SensorSimulator:
             2,
         )
 
-        # Temperatura del suelo — media diaria SiAR + oscilación retardada ~3h respecto al aire
+        # Temperatura del suelo: media diaria SiAR + oscilación retardada ~3h respecto al aire
         # cos(hour-18): pico ~18h (3h después del pico del aire a las 15h)
         s_mean    = day_weather.get("soil_temp", t_mean - 2.0)
         soil_temp = round(
@@ -434,7 +440,7 @@ class SensorSimulator:
             2,
         )
 
-        # Humedad del suelo — oscilación intra-día sobre el nivel diario (STOCK)
+        # Humedad del suelo: oscilación intra-día sobre el nivel diario (STOCK)
         # Acotada al rango físico ajustado de la parcela
         wp_limit = self._wp - 1.5 if self.plot_index == 3 else self._wp
         fc_limit = self._fc + 3.0 if self.plot_index == 7 else self._fc
@@ -562,7 +568,7 @@ def ensure_bucket_exists() -> None:
 def main() -> None:
     ensure_bucket_exists()
     parser = argparse.ArgumentParser(
-        description="Simulador de sensores AgroCollective (Sprint 2 — SiAR-anclado)"
+        description="Simulador de sensores AgroCollective (Sprint 2, SiAR-anclado)"
     )
     parser.add_argument("--realtime", action="store_true",
                         help="Espera 6 h reales entre ciclos (modo continuo)")
@@ -575,7 +581,7 @@ def main() -> None:
     args = parser.parse_args()
     random.seed(args.seed)
 
-    print("\n=== AgroCollective — Simulador SiAR-anclado (Sprint 2) ===")
+    print("\n=== AgroCollective - Simulador SiAR-anclado (Sprint 2) ===")
 
     # Resolver device→estación, perfil y tipo de suelo desde API (con fallback a SQL)
     device_station, device_profile, device_soil = load_simulation_config_from_api()
