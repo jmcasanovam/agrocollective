@@ -2,7 +2,7 @@
 
 ## Descripción
 
-Las parcelas monitorizadas por AgroCollective generan lecturas propias de temperatura y humedad, pero carecen de contexto climático regional: precipitación, evapotranspiración, radiación. Ese contexto lo aporta el Sistema de Información Agroclimática para el Regadío (SiAR), del Ministerio de Agricultura, Pesca y Alimentación, a través de dos estaciones de referencia —V17 (Valencia) y GR01 (Baza)— que sirven de proxy meteorológico para las regiones cubiertas por el proyecto.
+Las parcelas monitorizadas por AgroCollective generan lecturas propias de temperatura y humedad, pero carecen de contexto climático regional: precipitación, evapotranspiración, radiación. Ese contexto lo aporta el Sistema de Información Agroclimática para el Regadío (SiAR), del Ministerio de Agricultura, Pesca y Alimentación, a través de dos estaciones de referencia, V17 (Valencia) y GR01 (Baza), que sirven de proxy meteorológico para las regiones cubiertas por el proyecto.
 
 El script `scripts/download_siar.py` descarga el histórico diario de ambas estaciones, lo valida, interpola los huecos breves y lo escribe en InfluxDB, junto con una agregación semanal calculada localmente para el histórico y una tarea Flux que mantiene esa agregación al día en adelante. Es idempotente: ejecutarlo varias veces no duplica puntos, porque InfluxDB sobrescribe cualquier registro que comparta timestamp y etiquetas.
 
@@ -38,7 +38,7 @@ Conviene distinguir dos momentos en la vida de estas variables. `INFLUXDB_INIT_U
 
 No hace falta generarlo manualmente si el volumen de InfluxDB aún no existe: basta con escribir cualquier cadena razonablemente larga en `INFLUXDB_TOKEN` antes del primer `docker compose up`, y esa cadena se convierte en el token de administrador con acceso total. Es el camino que se ha seguido en este proyecto.
 
-Si en cambio InfluxDB ya está inicializado y se necesita un token nuevo —por ejemplo, uno con permisos más restringidos, o porque el original se ha perdido—, se genera desde la interfaz web:
+Si en cambio InfluxDB ya está inicializado y se necesita un token nuevo (por ejemplo, uno con permisos más restringidos, o porque el original se ha perdido), se genera desde la interfaz web:
 
 1. Entrar en `http://localhost:8086` con el usuario y contraseña de administrador.
 2. Ir a **Load Data → API Tokens → Generate API Token → All Access API Token**.
@@ -54,7 +54,7 @@ Como vía alternativa, el manual de la API SiAR (v2.2) describe un procedimiento
 2. Cifrar la contraseña con el mismo método: `GET {BaseURL}/API/V1/Autenticacion/cifrarCadena?cadena={password}`
 3. Canjear ambas cadenas cifradas por un token: `GET {BaseURL}/API/V1/Autenticacion/obtenerToken?Usuario={NIF_cifrado}&Password={password_cifrada}`
 
-Un matiz importante, descubierto al poner el script en marcha con datos reales: un token válido no da acceso ilimitado al histórico. SiAR autoriza cada token a partir de una fecha mínima —en el caso del token actualmente configurado, el 23 de junio de 2025—, y cualquier consulta anterior a esa fecha se rechaza con un HTTP 403 cuyo mensaje menciona explícitamente una «Fecha Mínima Inicial autorizada». No es un fallo de autenticación, sino una restricción de alcance del propio token, y el script la distingue como tal en sus mensajes de error en lugar de confundirla con un token inválido.
+Un matiz importante, descubierto al poner el script en marcha con datos reales: un token válido no da acceso ilimitado al histórico. SiAR autoriza cada token a partir de una fecha mínima (en el caso del token actualmente configurado, el 23 de junio de 2025), y cualquier consulta anterior a esa fecha se rechaza con un HTTP 403 cuyo mensaje menciona explícitamente una «Fecha Mínima Inicial autorizada». No es un fallo de autenticación, sino una restricción de alcance del propio token, y el script la distingue como tal en sus mensajes de error en lugar de confundirla con un token inválido.
 
 ---
 
@@ -66,9 +66,9 @@ Con los contenedores levantados (`docker compose up -d`), la descarga se lanza d
 docker compose exec backend python scripts/download_siar.py
 ```
 
-Antes de tocar la red, el script valida el token contra el servicio `Info/ACCESOS` de SiAR y comprueba que InfluxDB responde; si alguna de las dos cosas falla, lo dice de forma explícita —token inválido o caducado, InfluxDB inalcanzable— en vez de dejar que el error aparezca más adelante, a mitad de una descarga larga, con un mensaje genérico.
+Antes de tocar la red, el script valida el token contra el servicio `Info/ACCESOS` de SiAR y comprueba que InfluxDB responde; si alguna de las dos cosas falla, lo dice de forma explícita (token inválido o caducado, InfluxDB inalcanzable) en vez de dejar que el error aparezca más adelante, a mitad de una descarga larga, con un mensaje genérico.
 
-Superada esa comprobación, el script consulta cuál es la última fecha con datos ya almacenada en el bucket de clima. Si no encuentra ninguna, descarga el histórico completo desde la constante `DATE_START` (fijada en el propio script, actualmente el 23 de junio de 2025, por la restricción de token descrita arriba); si ya hay datos, retoma la descarga justo donde se quedó. La petición se trocea en bloques de 28 días —el límite razonable frente al rate-limit de SiAR— y, si la API responde con un 429 o un 403 de límite de peticiones, el script espera y reintenta con una espera creciente (30, 60 y 120 segundos) antes de darse por vencido.
+Superada esa comprobación, el script consulta cuál es la última fecha con datos ya almacenada en el bucket de clima. Si no encuentra ninguna, descarga el histórico completo desde la constante `DATE_START` (fijada en el propio script, actualmente el 23 de junio de 2025, por la restricción de token descrita arriba); si ya hay datos, retoma la descarga justo donde se quedó. La petición se trocea en bloques de 28 días (el límite razonable frente al rate-limit de SiAR) y, si la API responde con un 429 o un 403 de límite de peticiones, el script espera y reintenta con una espera creciente (30, 60 y 120 segundos) antes de darse por vencido.
 
 Como SiAR no siempre tiene publicado el dato del propio día en curso, el script no exige que el rango llegue hasta hoy a toda costa: recorta la fecha final, estación por estación, a la última fecha con datos realmente recibidos, y solo entonces valida huecos e interpola los que sean de una semana o menos.
 

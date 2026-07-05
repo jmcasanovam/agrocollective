@@ -2,14 +2,14 @@
 Cliente InfluxDB y constantes de esquema v2.1.
 
 Mediciones de CLIMA (SiAR):
-  weather        — grano DIARIO (DatosCalculados=true). Sin weather_daily.
-  weather_weekly — downsampling semanal desde weather (task InfluxDB).
+  weather        : grano DIARIO (DatosCalculados=true). Sin weather_daily.
+  weather_weekly : downsampling semanal desde weather (task InfluxDB).
                    Mismos límites de semana que measurements_weekly.
 
 Mediciones de SENSORES (IoT):
-  measurements         — grano HORARIO
-  measurements_daily   — downsampling diario (task InfluxDB)
-  measurements_weekly  — downsampling semanal (task InfluxDB)
+  measurements         : grano HORARIO
+  measurements_daily   : downsampling diario (task InfluxDB)
+  measurements_weekly  : downsampling semanal (task InfluxDB)
 """
 
 from influxdb_client import InfluxDBClient
@@ -26,7 +26,7 @@ class Measurements:
     SENSORS_WEEKLY   = "measurements_weekly"
 
 
-# Tags y fields de referencia — usados por el simulador y los consumers
+# Tags y fields de referencia, usados por el simulador y los consumers
 
 WEATHER_TAGS   = ["region_code", "siar_station_code"]
 WEATHER_FIELDS = ["eto", "pe", "precipitation", "air_temp", "relative_humidity", "soil_temp"]

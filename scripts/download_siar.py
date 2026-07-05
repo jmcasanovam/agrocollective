@@ -42,7 +42,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
-# httpx loguea la URL completa incluyendo el token — lo silenciamos
+# httpx loguea la URL completa incluyendo el token, lo silenciamos
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 

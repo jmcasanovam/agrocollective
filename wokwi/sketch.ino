@@ -1,6 +1,6 @@
 /*
  * AgroCollective - Fleet Node v0.2
- * ESP32 DevKit C V4 — flota de 10 parcelas
+ * ESP32 DevKit C V4 - flota de 10 parcelas
  *
  * Sensores físicos:
  *   GPIO 15 → DHT22  (temperatura aire + humedad relativa)
@@ -20,7 +20,7 @@
  *   fincas/{finca_id}/parcelas/{parcela_id}/lecturas
  *
  * Variables de conexión (declaradas al inicio; no tienen por qué existir
- * en el entorno real — el sketch puede sustituirse por credenciales reales):
+ * en el entorno real, el sketch puede sustituirse por credenciales reales):
  *   WIFI_SSID / WIFI_PASS
  *   MQTT_BROKER / MQTT_PORT / MQTT_CLIENT_ID
  */
@@ -70,7 +70,7 @@ const char* MQTT_PASS_STR  = "";   // dejar vacío si no hay autenticación
 #define SOIL_HUM_MAX   100.0f
 
 // ── Buffers (3 grupos por sensor físico) ──────────────────────────────────────
-// Buffer 1: sensor de temperatura ambiente (DHT22 — temperatura)
+// Buffer 1: sensor de temperatura ambiente (DHT22: temperatura)
 float bufAirTemp[BUFFER_SIZE];
 int   bufAirTempCount = 0;
 
@@ -78,7 +78,7 @@ int   bufAirTempCount = 0;
 float bufSoilTemp[BUFFER_SIZE];
 int   bufSoilTempCount = 0;
 
-// Buffer 3: sensores de humedad — ambiente (DHT22) y suelo (SEN0193)
+// Buffer 3: sensores de humedad: ambiente (DHT22) y suelo (SEN0193)
 float bufRelHum [BUFFER_SIZE];
 float bufSoilHum[BUFFER_SIZE];
 int   bufHumCount = 0;
@@ -105,7 +105,7 @@ struct Parcela {
   float       battery_mv;
 };
 
-// 4 olivos, 3 almendros, 3 viñas — 5 VALENCIA, 5 BAZA
+// 4 olivos, 3 almendros, 3 viñas: 5 VALENCIA, 5 BAZA
 Parcela fleet[FLEET_SIZE] = {
   {"F001", "P001", "ESP-P001", "olivo",    "VALENCIA", 30, 4200.0f},
   {"F001", "P002", "ESP-P002", "almendro", "VALENCIA", 30, 4185.0f},
@@ -139,7 +139,7 @@ void connectWiFi() {
   }
   Serial.println();
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("[WiFi] OK — IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("[WiFi] OK - IP: %s\n", WiFi.localIP().toString().c_str());
   } else {
     Serial.println("[WiFi] ERROR: tiempo de espera agotado");
   }
@@ -313,7 +313,7 @@ void processAndPublishIfReady() {
   if (bufSoilTempCount < BUFFER_SIZE) return;
   if (bufHumCount      < BUFFER_SIZE) return;
 
-  Serial.println("[Proceso] Buffers llenos — preprocesando...");
+  Serial.println("[Proceso] Buffers llenos: preprocesando...");
 
   float avgAirTemp  = filteredMean(bufAirTemp,  bufAirTempCount,  AIR_TEMP_MIN,  AIR_TEMP_MAX);
   float avgSoilTemp = filteredMean(bufSoilTemp, bufSoilTempCount, SOIL_TEMP_MIN, SOIL_TEMP_MAX);

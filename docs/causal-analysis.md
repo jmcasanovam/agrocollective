@@ -1,4 +1,4 @@
-# Fase 6 — Análisis Causal Inteligente
+# Fase 6: Análisis Causal Inteligente
 
 ## Objetivo
 
@@ -143,6 +143,6 @@ alembic/versions/
 ```
 INFO [Fase 6] Iniciando análisis causal...
 INFO [Fase 6] Parcela a1b2c3d4... | feature=soil_humidity → causa=irrigation_mm (r=+0.87) | La correlación histórica entre 'soil_humidity' e 'irrigation_mm' es +0.87. Causa probable: exceso de volumen de riego.
-INFO [Fase 6] Parcela e5f6g7h8... | feature=air_temp → causa=— (r=0.00) | sin correlación suficiente
+INFO [Fase 6] Parcela e5f6g7h8... | feature=air_temp → causa=None (r=0.00) | sin correlación suficiente
 INFO [Fase 6] 1 causas identificadas de 2 features anómalas.
 ```

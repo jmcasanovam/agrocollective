@@ -1,5 +1,5 @@
 """
-Publicador de telemetría en vivo — AgroCollective.
+Publicador de telemetría en vivo: AgroCollective.
 
 Genera y publica por MQTT una lectura cada 15 minutos para cada dispositivo
 activo del sistema (parcelas reales creadas desde la UI y también las
@@ -162,7 +162,7 @@ def anomaly_plot_index(device_code: str) -> int:
 
 
 # =============================================================================
-# Clima SiAR — última(s) fecha(s) disponible(s) por estación
+# Clima SiAR: última(s) fecha(s) disponible(s) por estación
 # =============================================================================
 
 
@@ -391,7 +391,7 @@ def main() -> None:
     parser.add_argument("--once", action="store_true", help="Ejecuta un único ciclo (rellenado + un tick) y termina")
     args = parser.parse_args()
 
-    header("AgroCollective — Publicador de telemetría en vivo")
+    header("AgroCollective - Publicador de telemetría en vivo")
     sim.ensure_bucket_exists()
 
     metas = load_active_devices()

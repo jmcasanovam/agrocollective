@@ -16,7 +16,7 @@ Las features provienen directamente del `PlotAggregates` calculado en la Fase 3:
 | `avg_air_temp` | Temperatura media del aire | °C |
 | `avg_soil_temp` | Temperatura media del suelo | °C |
 | `avg_air_humidity` | Humedad relativa media del aire | % |
-| `irrigation_frequency` | Número de riegos en la ventana | — |
+| `irrigation_frequency` | Número de riegos en la ventana | - |
 | `avg_irrigation_mm` | Media de mm por riego | mm |
 | `total_water_mm` | Total de mm aplicados | mm |
 | `yield_kg_ha` | Producción de la última cosecha | kg/ha |
@@ -127,7 +127,7 @@ Clustering guardado | run_date=2026-06-29 | k=2 | parcelas=5
 
 ```
 [Fase 4] Iniciando K-Means sobre 1 parcelas...
-K-Means: solo 1 parcela(s) — asignando cluster único.
+K-Means: solo 1 parcela(s), asignando cluster único.
 Clustering guardado | run_date=2026-06-29 | k=1 | parcelas=1
 === Pipeline completado | Fases 3-4 | 1 parcelas | k=1 | 0.1s ===
 ```

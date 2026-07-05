@@ -1,11 +1,11 @@
-# Fase 8 — Predicción ML (Random Forest)
+# Fase 8: Predicción ML (Random Forest)
 
 ## Objetivo
 
 Predecir para cada parcela los valores futuros esperados de:
 
-- **`yield_kg_ha`** — rendimiento de cosecha (kg/ha)
-- **`water_efficiency`** — eficiencia hídrica (kg/mm×ha)
+- **`yield_kg_ha`**: rendimiento de cosecha (kg/ha)
+- **`water_efficiency`**: eficiencia hídrica (kg/mm×ha)
 
 Las predicciones permiten detectar brechas entre lo esperado y lo observado (alimenta la Fase 9), y ofrecer al agricultor una referencia de rendimiento potencial.
 
@@ -114,8 +114,8 @@ alembic/versions/
 
 ```
 INFO [Fase 8] Iniciando predicción ML (Random Forest)...
-INFO [Fase 8] Target 'yield_kg_ha': solo 1 muestras con valor (mínimo 10) — predicción omitida.
-INFO [Fase 8] Target 'water_efficiency': solo 1 muestras con valor (mínimo 10) — predicción omitida.
+INFO [Fase 8] Target 'yield_kg_ha': solo 1 muestras con valor (mínimo 10): predicción omitida.
+INFO [Fase 8] Target 'water_efficiency': solo 1 muestras con valor (mínimo 10): predicción omitida.
 INFO [Fase 8] 0 predicciones con valor de 2 totales.
 ```
 

@@ -1,4 +1,4 @@
-# Frontend API Handoff — AgroCollective
+# Frontend API Handoff - AgroCollective
 
 **Base URL:** `http://localhost:8000`  
 **Documentación interactiva:** `http://localhost:8000/docs` (Swagger)  
@@ -6,7 +6,7 @@
 
 ---
 
-## Punto de partida — modelo de datos
+## Punto de partida - modelo de datos
 
 Un usuario tiene una o varias **fincas**. Cada finca contiene **parcelas**. Cada parcela tiene al menos un **dispositivo IoT** que envía lecturas de sensores en tiempo real vía MQTT. Con esos datos, el backend ejecuta cada noche un pipeline de análisis agronómico y guarda los resultados, que el front consume bajo demanda.
 
@@ -39,7 +39,7 @@ Guardar el `access_token` y enviarlo en todas las peticiones autenticadas.
 
 ---
 
-## Flujo 1 — Mis fincas
+## Flujo 1 - Mis fincas
 
 Pantalla principal tras el login. Muestra las fincas del usuario autenticado.
 
@@ -53,7 +53,7 @@ DELETE /farms/{farm_id}                    → eliminar
 
 ---
 
-## Flujo 2 — Parcelas de una finca
+## Flujo 2 - Parcelas de una finca
 
 Al seleccionar una finca → listado de sus parcelas. Para los selectores de cultivo y suelo al crear/editar, usar el catálogo.
 
@@ -72,7 +72,7 @@ Nota: no existe `GET /plots/{plot_id}` sin `farm_id` (a diferencia de lo que sug
 
 ---
 
-## Flujo 3 — Dispositivos IoT de una parcela
+## Flujo 3 - Dispositivos IoT de una parcela
 
 Cada parcela tiene al menos un dispositivo. La UI debería mostrar si está activo (tiempo desde `last_seen_at`) y el nivel de batería.
 
@@ -86,13 +86,13 @@ DELETE /plots/{plot_id}/devices/{device_id}
 
 | Campo | Descripción |
 |-------|-------------|
-| `last_seen_at` | Última lectura recibida — usar para indicar activo / offline |
+| `last_seen_at` | Última lectura recibida: usar para indicar activo / offline |
 | `battery_mv` | Batería en milivoltios (típico: 3300 mv ≈ 100%) |
 | `is_active` | Si el dispositivo está habilitado por el usuario |
 
 ---
 
-## Flujo 4 — Lecturas de sensores
+## Flujo 4 - Lecturas de sensores
 
 Para mostrar el estado actual del suelo/ambiente o una gráfica histórica.  
 Sensores disponibles: `soil_humidity`, `air_temp`, `soil_temp`, `air_humidity`.
@@ -116,7 +116,7 @@ GET /plots/{plot_id}/weather
 
 ---
 
-## Flujo 5 — Riego e historial de cosechas
+## Flujo 5 - Riego e historial de cosechas
 
 Datos que el usuario introduce manualmente y que alimentan el modelo ML. Cuantos más registros históricos, mejores predicciones.
 
@@ -128,13 +128,13 @@ GET  /plots/{plot_id}/harvests?limit=100&offset=0     → historial de cosechas
 POST /plots/{plot_id}/harvests     { harvest_date, yield_kg_ha, water_consumed_m3_ha }
 ```
 
-`limit`/`offset` son opcionales (default `limit=100`, máximo 500), para no traer histórico ilimitado. Ambos POST devuelven **409** si ya existe un registro para esa combinación (`plot_id` + `week_start` en riego, `plot_id` + `harvest_date` en cosecha) — el front debería mostrarlo como error de validación, no como fallo genérico.
+`limit`/`offset` son opcionales (default `limit=100`, máximo 500), para no traer histórico ilimitado. Ambos POST devuelven **409** si ya existe un registro para esa combinación (`plot_id` + `week_start` en riego, `plot_id` + `harvest_date` en cosecha). El front debería mostrarlo como error de validación, no como fallo genérico.
 
 ---
 
-## Flujo 6 — Resultados del algoritmo de inteligencia
+## Flujo 6 - Resultados del algoritmo de inteligencia
 
-El backend ejecuta un pipeline de análisis agronómico **una vez al día, ~02:00 UTC**. El front **no dispara** el pipeline — solo lee los resultados. No hace falta polling; con cargar al abrir la pantalla de parcela es suficiente.
+El backend ejecuta un pipeline de análisis agronómico **una vez al día, ~02:00 UTC**. El front **no dispara** el pipeline, solo lee los resultados. No hace falta polling; con cargar al abrir la pantalla de parcela es suficiente.
 
 **Parámetros comunes a todos los endpoints de inteligencia:**
 
@@ -143,7 +143,7 @@ El backend ejecuta un pipeline de análisis agronómico **una vez al día, ~02:0
 
 ---
 
-### 6.1 — Recomendaciones agronómicas
+### 6.1 - Recomendaciones agronómicas
 
 ```
 GET /plots/{plot_id}/recommendations
@@ -161,7 +161,7 @@ Campos de cada recomendación: `category`, `priority`, `title`, `body`, `run_dat
 
 ---
 
-### 6.2 — Detección de anomalías (LOF)
+### 6.2 - Detección de anomalías (LOF)
 
 ```
 GET /plots/{plot_id}/anomalies?limit=100&offset=0
@@ -178,7 +178,7 @@ Historial de detección de anomalías. Sin `run_date` devuelve todos los registr
 
 ---
 
-### 6.3 — Parcelas análogas (más similares)
+### 6.3 - Parcelas análogas (más similares)
 
 ```
 GET /plots/{plot_id}/analogues
@@ -189,15 +189,15 @@ Las 5 parcelas más parecidas agronómicamente, ordenadas de más a menos simila
 | Campo | Descripción |
 |-------|-------------|
 | `analogue_plot_id` | ID interno de la parcela análoga |
-| `distance` | Distancia euclidiana normalizada — menor = más parecida |
+| `distance` | Distancia euclidiana normalizada: menor = más parecida |
 | `same_cluster` | `true` si pertenecen al mismo grupo K-Means |
 | `rank` | Posición 1–5 por similitud |
 
-**No hay forma de resolver `analogue_plot_id` a un nombre.** No existe ningún endpoint que devuelva una parcela por ID sin pasar por su finca, y aunque existiera, la parcela análoga puede pertenecer a otro usuario (la búsqueda es global sobre todo el sistema, ver `docs/analogue-search.md`) — mostrar su nombre real rompería la anonimización que `hash_plot` está pensada para garantizar. El front debe presentar cada análoga de forma genérica, por ejemplo "Parcela análoga #{rank}".
+**No hay forma de resolver `analogue_plot_id` a un nombre.** No existe ningún endpoint que devuelva una parcela por ID sin pasar por su finca, y aunque existiera, la parcela análoga puede pertenecer a otro usuario (la búsqueda es global sobre todo el sistema, ver `docs/analogue-search.md`). Mostrar su nombre real rompería la anonimización que `hash_plot` está pensada para garantizar. El front debe presentar cada análoga de forma genérica, por ejemplo "Parcela análoga #{rank}".
 
 ---
 
-### 6.4 — Predicciones ML (Random Forest)
+### 6.4 - Predicciones ML (Random Forest)
 
 ```
 GET /plots/{plot_id}/ml-predictions
@@ -214,7 +214,7 @@ Predicciones de un modelo Random Forest entrenado con todas las parcelas. Devuel
 
 ---
 
-### 6.5 — Historial de rendimiento
+### 6.5 - Historial de rendimiento
 
 ```
 GET /plots/{plot_id}/performance-history?limit=90

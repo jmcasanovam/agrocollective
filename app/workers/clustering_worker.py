@@ -2,17 +2,17 @@
 Worker de procesamiento inteligente nocturno (Fases 3-10).
 
 Fases implementadas:
-  Fase 3  — Obtención de históricos y generación de variables agregadas  ✓
-  Fase 4  — Clustering K-Means                                           ✓
-  Fase 5  — Detección de anomalías (LOF)                                ✓
-  Fase 6  — Análisis causal                                             ✓
-  Fase 7  — Búsqueda de parcelas análogas                               ✓
-  Fase 8  — Predicción ML (Random Forest)                               ✓
-  Fase 9  — Generación de recomendaciones                               ✓
-  Fase 10 — Actualización del historial de rendimiento                 ✓
-  Fase 8  — Predicción ML                                               (pendiente)
-  Fase 9  — Generación de recomendaciones                               (pendiente)
-  Fase 10 — Actualización del historial                                 (pendiente)
+  Fase 3  : Obtención de históricos y generación de variables agregadas  ✓
+  Fase 4  : Clustering K-Means                                           ✓
+  Fase 5  : Detección de anomalías (LOF)                                ✓
+  Fase 6  : Análisis causal                                             ✓
+  Fase 7  : Búsqueda de parcelas análogas                               ✓
+  Fase 8  : Predicción ML (Random Forest)                               ✓
+  Fase 9  : Generación de recomendaciones                               ✓
+  Fase 10 : Actualización del historial de rendimiento                 ✓
+  Fase 8  : Predicción ML                                               (pendiente)
+  Fase 9  : Generación de recomendaciones                               (pendiente)
+  Fase 10 : Actualización del historial                                 (pendiente)
 """
 
 import logging
@@ -74,9 +74,9 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
                     agg.avg_soil_humidity or 0,
                     agg.avg_air_temp or 0,
                     agg.irrigation_frequency,
-                    f"{agg.total_water_mm:.1f}" if agg.total_water_mm else "—",
-                    f"{agg.yield_kg_ha:.1f}" if agg.yield_kg_ha else "—",
-                    f"{agg.water_efficiency:.4f}" if agg.water_efficiency else "—",
+                    f"{agg.total_water_mm:.1f}" if agg.total_water_mm else "N/D",
+                    f"{agg.yield_kg_ha:.1f}" if agg.yield_kg_ha else "N/D",
+                    f"{agg.water_efficiency:.4f}" if agg.water_efficiency else "N/D",
                 )
             except Exception as exc:
                 logger.exception("[Fase 3] Error procesando parcela %s: %s", plot.id, exc)
@@ -152,6 +152,6 @@ def run_pipeline(window_days: int | None = None) -> ClusteringResult:
 
 if __name__ == "__main__":
     import sys
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s — %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s - %(message)s")
     days = int(sys.argv[1]) if len(sys.argv) > 1 else None
     run_pipeline(window_days=days)

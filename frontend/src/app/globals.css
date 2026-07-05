@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* This app only ships a light theme — no dark-mode variant is designed,
+/* This app only ships a light theme, no dark-mode variant is designed,
    so we never flip these off prefers-color-scheme (that previously left
    the raw body showing near-black during any unstyled/loading moment). */
 :root {

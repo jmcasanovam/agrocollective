@@ -1,4 +1,4 @@
-# AgroCollective — Documentación técnica
+# AgroCollective: Documentación técnica
 
 Documentación del pipeline de datos inteligente: desde la captura IoT hasta las recomendaciones agronómicas personalizadas.
 
@@ -6,13 +6,13 @@ Documentación del pipeline de datos inteligente: desde la captura IoT hasta las
 
 ## Índice
 
-### Fase 1 — Captura MQTT en tiempo real
+### Fase 1: Captura MQTT en tiempo real
 
 | Documento | Qué cubre |
 |---|---|
 | [mqtt-flow.md](mqtt-flow.md) | Los dispositivos ESP32 publican lecturas de sensores al broker Mosquitto bajo el topic `devices/{device_code}/readings`. El backend FastAPI consume estos mensajes en tiempo real mediante un hilo MQTT dedicado: valida el payload con Pydantic, identifica la parcela a través del `device_code` y dispara el almacenamiento. |
 
-### Fase 2 — Ingesta y almacenamiento
+### Fase 2: Ingesta y almacenamiento
 
 | Documento | Qué cubre |
 |---|---|
@@ -24,16 +24,16 @@ El pipeline se lanza cada noche a las `CLUSTERING_SCHEDULE_HOUR` UTC y procesa t
 
 | Documento | Qué cubre |
 |---|---|
-| [aggregation.md](aggregation.md) | **Fase 3** — Comprime el histórico de cada parcela en un conjunto de variables representativas: medias de sensores (InfluxDB), frecuencia de riego, volumen total y eficiencia hídrica (PostgreSQL). Estas variables son la entrada del algoritmo. |
-| [clustering-kmeans.md](clustering-kmeans.md) | **Fase 4** — K-Means agrupa las parcelas por similitud agronómica en clusters. Cada cluster tiene una media de referencia (benchmark) que se usa en las fases siguientes para detectar desviaciones. |
-| [anomaly-detection-lof.md](anomaly-detection-lof.md) | **Fase 5** — LOF (Local Outlier Factor) detecta parcelas estadísticamente inusuales dentro de su cluster e identifica qué variables concretas son las responsables de la anomalía. |
-| [causal-analysis.md](causal-analysis.md) | **Fase 6** — Para cada variable anómala, calcula la correlación de Pearson entre su serie temporal semanal y las variables candidatas (volumen de riego, otros sensores) para identificar la causa probable. |
-| [analogue-search.md](analogue-search.md) | **Fase 7** — Calcula la distancia euclidiana entre todas las parcelas en el espacio de features normalizado y guarda las N más cercanas a cada una. Sirve como referencia de buenas prácticas. |
-| [ml-prediction.md](ml-prediction.md) | **Fase 8** — Entrena un Random Forest global por variable objetivo (`yield_kg_ha` y `water_efficiency`) y predice el valor esperado para cada parcela. La brecha con el valor real alimenta las recomendaciones. |
-| [recommendations.md](recommendations.md) | **Fase 9** — Sintetiza las salidas de todas las fases anteriores en recomendaciones accionables para cada parcela. Tres categorías: `anomaly` (causas identificadas), `prediction` (brecha con el potencial ML) y `benchmark` (diferencia con la media del cluster). |
-| [performance-history.md](performance-history.md) | **Fase 10** — Al cierre del pipeline guarda en `plot_performance_history` una instantánea completa del estado de cada parcela: variables agregadas, cluster, anomalía, predicción ML y recuento de recomendaciones. |
+| [aggregation.md](aggregation.md) | **Fase 3**: Comprime el histórico de cada parcela en un conjunto de variables representativas: medias de sensores (InfluxDB), frecuencia de riego, volumen total y eficiencia hídrica (PostgreSQL). Estas variables son la entrada del algoritmo. |
+| [clustering-kmeans.md](clustering-kmeans.md) | **Fase 4**: K-Means agrupa las parcelas por similitud agronómica en clusters. Cada cluster tiene una media de referencia (benchmark) que se usa en las fases siguientes para detectar desviaciones. |
+| [anomaly-detection-lof.md](anomaly-detection-lof.md) | **Fase 5**: LOF (Local Outlier Factor) detecta parcelas estadísticamente inusuales dentro de su cluster e identifica qué variables concretas son las responsables de la anomalía. |
+| [causal-analysis.md](causal-analysis.md) | **Fase 6**: Para cada variable anómala, calcula la correlación de Pearson entre su serie temporal semanal y las variables candidatas (volumen de riego, otros sensores) para identificar la causa probable. |
+| [analogue-search.md](analogue-search.md) | **Fase 7**: Calcula la distancia euclidiana entre todas las parcelas en el espacio de features normalizado y guarda las N más cercanas a cada una. Sirve como referencia de buenas prácticas. |
+| [ml-prediction.md](ml-prediction.md) | **Fase 8**: Entrena un Random Forest global por variable objetivo (`yield_kg_ha` y `water_efficiency`) y predice el valor esperado para cada parcela. La brecha con el valor real alimenta las recomendaciones. |
+| [recommendations.md](recommendations.md) | **Fase 9**: Sintetiza las salidas de todas las fases anteriores en recomendaciones accionables para cada parcela. Tres categorías: `anomaly` (causas identificadas), `prediction` (brecha con el potencial ML) y `benchmark` (diferencia con la media del cluster). |
+| [performance-history.md](performance-history.md) | **Fase 10**: Al cierre del pipeline guarda en `plot_performance_history` una instantánea completa del estado de cada parcela: variables agregadas, cluster, anomalía, predicción ML y recuento de recomendaciones. |
 
-### API REST — Resultados para el frontend
+### API REST: Resultados para el frontend
 
 Los resultados del pipeline se exponen a través de endpoints autenticados bajo `/plots/{plot_id}/`:
 
@@ -63,14 +63,14 @@ Todos los endpoints verifican que la parcela pertenece al usuario autenticado. L
 Sensor IoT (ESP32)
    │  JSON → topic: devices/{device_code}/readings
    ▼
-Mosquitto broker  [Fase 1 — mqtt-flow.md]
+Mosquitto broker  [Fase 1: mqtt-flow.md]
    │
    ▼
 FastAPI MQTT consumer (hilo dedicado)
    │  valida · busca parcela · persiste
    ▼
 InfluxDB (series temporales)    PostgreSQL (riegos, cosechas, dispositivos)
-           [Fase 2 — influxdb-ingestion.md]
+           [Fase 2: influxdb-ingestion.md]
    │                                  │
    └──────────────┬───────────────────┘
                   ▼  clustering_worker.py  (02:00 UTC)

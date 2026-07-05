@@ -1,4 +1,4 @@
-# Fase 7 — Búsqueda de Parcelas Análogas
+# Fase 7: Búsqueda de Parcelas Análogas
 
 ## Objetivo
 

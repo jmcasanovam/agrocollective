@@ -1,4 +1,4 @@
-# Fase 10 — Actualización del Historial de Rendimiento
+# Fase 10: Actualización del Historial de Rendimiento
 
 ## Objetivo
 
@@ -17,13 +17,13 @@ Cada registro agrega en un único lugar los resultados de las fases anteriores:
 
 | Campo | Fuente |
 |---|---|
-| `cluster_id` | Fase 4 — K-Means |
-| `avg_soil_humidity`, `avg_air_temp`, `avg_soil_temp`, `avg_air_humidity` | Fase 3 — Agregación InfluxDB |
-| `irrigation_frequency`, `avg_irrigation_mm`, `total_water_mm` | Fase 3 — Agregación PostgreSQL |
-| `yield_kg_ha`, `water_efficiency` | Fase 3 — Cosecha + cálculo de eficiencia |
-| `is_anomaly`, `lof_score` | Fase 5 — LOF |
-| `predicted_yield`, `predicted_efficiency` | Fase 8 — Random Forest |
-| `n_recommendations`, `n_high_priority` | Fase 9 — Recomendaciones |
+| `cluster_id` | Fase 4: K-Means |
+| `avg_soil_humidity`, `avg_air_temp`, `avg_soil_temp`, `avg_air_humidity` | Fase 3: Agregación InfluxDB |
+| `irrigation_frequency`, `avg_irrigation_mm`, `total_water_mm` | Fase 3: Agregación PostgreSQL |
+| `yield_kg_ha`, `water_efficiency` | Fase 3: Cosecha + cálculo de eficiencia |
+| `is_anomaly`, `lof_score` | Fase 5: LOF |
+| `predicted_yield`, `predicted_efficiency` | Fase 8: Random Forest |
+| `n_recommendations`, `n_high_priority` | Fase 9: Recomendaciones |
 
 ---
 
@@ -85,14 +85,14 @@ alembic/versions/
 ```
 === Inicio pipeline clustering | 2026-06-30T17:18:29Z ===
 [Fase 3] Parcelas a procesar: 1
-[Fase 3][1/1] Parcela 3af2e32d... | hum=45.0 air=22.5 riego=0 total_mm=— yield=— eff=—
+[Fase 3][1/1] Parcela 3af2e32d... | hum=45.0 air=22.5 riego=0 total_mm=None yield=None eff=None
 [Fase 4] Iniciando K-Means sobre 1 parcelas...
-K-Means: solo 1 parcela(s) — asignando cluster único.
+K-Means: solo 1 parcela(s), asignando cluster único.
 [Fase 5] 0 anomalías detectadas de 1 parcelas.
 [Fase 6] Sin parcelas anómalas con features identificadas.
-[Fase 7] Menos de 2 parcelas — sin análogas que calcular.
-[Fase 8] Target 'yield_kg_ha': solo 0 muestras (mínimo 10) — predicción omitida.
-[Fase 8] Target 'water_efficiency': solo 0 muestras (mínimo 10) — predicción omitida.
+[Fase 7] Menos de 2 parcelas, sin análogas que calcular.
+[Fase 8] Target 'yield_kg_ha': solo 0 muestras (mínimo 10), predicción omitida.
+[Fase 8] Target 'water_efficiency': solo 0 muestras (mínimo 10), predicción omitida.
 [Fase 9] 0 recomendaciones generadas para 1 parcelas.
 [Fase 10] 1 instantáneas de rendimiento registradas para run_date=2026-06-30.
 === Pipeline completado | Fases 3-10 | 1 parcelas | k=1 | 0 anomalías | 0 causas | 0 predicciones | 0 recomendaciones | 0.1s ===

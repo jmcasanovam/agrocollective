@@ -100,7 +100,7 @@ class KMeansService:
         result.n_clusters = k
 
         if k == 1:
-            logger.info("K-Means: solo %d parcela(s) — asignando cluster único.", n_plots)
+            logger.info("K-Means: solo %d parcela(s), asignando cluster único.", n_plots)
             assignments = self._single_cluster(aggregates, X)
             result.assignments = assignments
             return result

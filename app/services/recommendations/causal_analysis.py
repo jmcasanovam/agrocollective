@@ -89,7 +89,7 @@ class CausalAnalysisService:
                     "[Fase 6] Parcela %s... | feature=%s → causa=%s (r=%.2f) | %s",
                     str(anomaly.plot_id)[:8],
                     feature,
-                    result.causal_feature or "—",
+                    result.causal_feature or "N/D",
                     result.correlation or 0,
                     result.explanation or "sin correlación suficiente",
                 )

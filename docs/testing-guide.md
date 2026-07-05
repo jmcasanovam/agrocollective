@@ -12,7 +12,7 @@ Pasos seguidos para verificar el sistema completo: desde la simulación IoT hast
 
 ---
 
-## Paso 1 — Crear el entorno de simulación
+## Paso 1: Crear el entorno de simulación
 
 El script `setup_simulation.py` crea via API un usuario, una finca con 10 parcelas y sus dispositivos, y luego inserta directamente en PostgreSQL 8 semanas de registros de riego y 1 cosecha por parcela.
 
@@ -40,7 +40,7 @@ SELECT count(*) FROM harvests;       -- >= 10
 
 ---
 
-## Paso 2 — Simular lecturas de sensores (MQTT → InfluxDB + PostgreSQL)
+## Paso 2: Simular lecturas de sensores (MQTT → InfluxDB + PostgreSQL)
 
 El script `simulate_sensors.py` publica mensajes MQTT con datos de 3 perfiles agronómicos:
 
@@ -76,7 +76,7 @@ SELECT code, last_seen_at, battery_mv FROM devices ORDER BY code;
 
 ---
 
-## Paso 3 — Ejecutar el pipeline manualmente
+## Paso 3: Ejecutar el pipeline manualmente
 
 El pipeline nocturno (Fases 3-10) se ejecuta automáticamente a las `CLUSTERING_SCHEDULE_HOUR` UTC, pero se puede lanzar a mano:
 
@@ -87,7 +87,7 @@ docker exec agro_backend python -m app.workers.clustering_worker
 **Resultado esperado en los logs:**
 
 ```
-INFO — Pipeline completado | Fases 3-10 | 11 parcelas | k=5 | 0 anomalías | 0 causas | 22 predicciones | 1 recomendaciones | 2.5s
+INFO - Pipeline completado | Fases 3-10 | 11 parcelas | k=5 | 0 anomalías | 0 causas | 22 predicciones | 1 recomendaciones | 2.5s
 ```
 
 **Interpretación de los valores:**
@@ -113,9 +113,9 @@ ORDER BY pc.cluster_id, p.name;
 
 ---
 
-## Paso 4 — Consumir la API REST (frontend)
+## Paso 4: Consumir la API REST (frontend)
 
-### 4.1 — Autenticación
+### 4.1: Autenticación
 
 ```powershell
 $r = Invoke-RestMethod -Uri "http://localhost:8000/auth/login" `
@@ -125,7 +125,7 @@ $token = $r.access_token
 $headers = @{ Authorization = "Bearer $token" }
 ```
 
-### 4.2 — Obtener IDs de finca y parcelas
+### 4.2: Obtener IDs de finca y parcelas
 
 ```powershell
 $farms  = Invoke-RestMethod -Uri "http://localhost:8000/farms" -Headers $headers
@@ -136,7 +136,7 @@ $p09    = $plots | Where-Object { $_.name -eq "Sim-P09" }
 $plot_id = $p09.id
 ```
 
-### 4.3 — Endpoints de inteligencia
+### 4.3: Endpoints de inteligencia
 
 Todos requieren autenticación JWT y verifican que la parcela pertenece al usuario.
 

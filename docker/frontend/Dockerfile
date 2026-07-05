@@ -1,4 +1,4 @@
-# Multi-stage build — mismo patrón que docker/backend/Dockerfile
+# Multi-stage build - mismo patrón que docker/backend/Dockerfile
 
 # ── deps: instala dependencias con pnpm ───────────────────────────────────────
 FROM node:22-alpine AS deps

@@ -25,7 +25,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Guards the /login resolution below against re-entering itself: it
   // clears/selects the farm as part of deciding where to go, which changes
   // `selectedFarmId` (a dependency of this same effect) while `pathname`
-  // hasn't updated yet (router.push resolves asynchronously) — without this
+  // hasn't updated yet (router.push resolves asynchronously), without this
   // guard that retriggers the whole clear→fetch→select→push cycle in a
   // tight loop that hammers "/" and never settles.
   const loginHandledRef = useRef(false);
@@ -51,7 +51,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (pathname === "/login") {
-      // Run exactly once per arrival here — the resolution below changes
+      // Run exactly once per arrival here: the resolution below changes
       // `selectedFarmId`, which would otherwise retrigger this same branch
       // before `pathname` catches up to the navigation it just started.
       if (loginHandledRef.current) return;
@@ -61,7 +61,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       // user lands. Resolving the farm count *before* navigating means a
       // single-farm account (the common case) jumps straight to the
       // dashboard instead of visibly bouncing through /farms while it
-      // fetches the same list — and having only one owner for this logic
+      // fetches the same list, and having only one owner for this logic
       // avoids racing against any navigation login-form.tsx might trigger.
       let cancelled = false;
       useFarmStore.getState().clearSelectedFarm();
@@ -110,7 +110,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return loadingScreen;
   }
 
-  // If not logged in, render children directly only on /login — any other
+  // If not logged in, render children directly only on /login: any other
   // route means the redirect effect above hasn't fired yet (e.g. right
   // after logout), so show the loading screen instead of flashing the
   // protected page's content without the shell.

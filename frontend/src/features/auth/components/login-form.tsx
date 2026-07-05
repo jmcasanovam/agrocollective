@@ -24,7 +24,7 @@ export function LoginForm() {
   const [isLoginView, setIsLoginView] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Stays true after a successful login until AppLayout finishes resolving
-  // where to navigate (it owns that decision) — avoids the submit button
+  // where to navigate (it owns that decision), avoiding the submit button
   // flickering back to its idle state during that final gap.
   const [isRedirecting, setIsRedirecting] = useState(false);
 

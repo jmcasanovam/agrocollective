@@ -97,7 +97,7 @@ export function PlotSensorsCard({ plotId }: PlotSensorsCardProps) {
           {sensorKeys.map((key) => {
             const meta = SENSOR_META[key];
             const reading = latestBySensor.get(key);
-            const value = reading ? `${reading.value.toFixed(1)}${meta.unit}` : "—";
+            const value = reading ? `${reading.value.toFixed(1)}${meta.unit}` : "N/D";
             return (
               <div
                 key={key}

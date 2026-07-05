@@ -140,7 +140,7 @@ def _psql_rows(sql: str) -> list[list[str]]:
         return rows
 
 # =============================================================================
-# PASO 0 — Resolver region_ids
+# PASO 0: Resolver region_ids
 # =============================================================================
 
 def wipe_existing_data():
@@ -252,7 +252,7 @@ def get_soil_ids(client) -> list[str]:
     ]
 
 # =============================================================================
-# PASO 1 — Usuario
+# PASO 1: Usuario
 # =============================================================================
 
 def setup_user_by_email(client, email: str) -> str:
@@ -274,7 +274,7 @@ def setup_user_by_email(client, email: str) -> str:
     return token
 
 # =============================================================================
-# PASO 2 — 2 Fincas con región
+# PASO 2: 2 Fincas con región
 # =============================================================================
 
 def setup_farms_dynamic(client, farms_def, region_ids: dict[str, str]) -> dict[str, str]:
@@ -309,7 +309,7 @@ def setup_farms_dynamic(client, farms_def, region_ids: dict[str, str]) -> dict[s
     return farm_ids
 
 # =============================================================================
-# PASO 3 — Parcelas y dispositivos
+# PASO 3: Parcelas y dispositivos
 # =============================================================================
 
 def setup_plots_dynamic(
@@ -371,7 +371,7 @@ def setup_plots_dynamic(
     return plot_ids
 
 # =============================================================================
-# PASO 4 — Datos históricos: riego año móvil + cosechas por cultivo
+# PASO 4: Datos históricos: riego año móvil + cosechas por cultivo
 # =============================================================================
 
 def setup_historical_data(plot_ids: list[str | None]) -> None:
@@ -450,7 +450,7 @@ def setup_historical_data(plot_ids: list[str | None]) -> None:
             )
 
 # =============================================================================
-# PASO 5 — Verificar
+# PASO 5: Verificar
 # =============================================================================
 
 def verify() -> None:
@@ -546,7 +546,7 @@ def main():
 
     global SIM_START, SIM_END
     SIM_START, SIM_END = get_simulation_dates()
-    header("AgroCollective — Setup de simulacion (Sprint 2)")
+    header("AgroCollective - Setup de simulacion (Sprint 2)")
     info(f"API: {API_BASE_URL}")
     info(f"Rango de simulación: {SIM_START} → {SIM_END}")
     info(f"Parcelas: {N_PLOTS}  (100 parcelas divididas entre 5 usuarios)")
