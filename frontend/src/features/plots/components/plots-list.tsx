@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import { usePlots } from "../api/get-plots";
+import { useFarmPerformanceSummary } from "../api/get-farm-performance-summary";
 import { PlotCard } from "./plot-card";
 import { PlotFormModal } from "./plot-form-modal";
 
 interface PlotsListProps {
   selectedFarm?: { id: string; name: string } | null;
+  // Resuelto por el llamador (features/plots no puede importar de features/farms).
+  locationLabel?: string | null;
 }
 
-export function PlotsList({ selectedFarm }: PlotsListProps) {
+export function PlotsList({ selectedFarm, locationLabel }: PlotsListProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { data: plots, isLoading, isError, error } = usePlots(selectedFarm?.id ?? null);
+  const { entries: performanceEntries } = useFarmPerformanceSummary((plots ?? []).map((p) => p.id));
+  const performanceByPlot = new Map(performanceEntries.map((e) => [e.plot_id, e]));
 
   if (!selectedFarm) {
     return (
@@ -103,7 +108,12 @@ export function PlotsList({ selectedFarm }: PlotsListProps) {
       ) : (
         <div className="flex flex-col gap-3.5">
           {plots.map((plot) => (
-            <PlotCard key={plot.id} plot={plot} />
+            <PlotCard
+              key={plot.id}
+              plot={plot}
+              performance={performanceByPlot.get(plot.id)}
+              locationLabel={locationLabel}
+            />
           ))}
         </div>
       )}

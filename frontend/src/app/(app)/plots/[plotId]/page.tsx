@@ -3,6 +3,7 @@
 import { use } from "react";
 import { PlotDetail } from "@/features/plots/components/plot-detail";
 import { useFarmStore } from "@/features/farms/stores/farm";
+import { useFarmLocationLabel } from "@/features/farms/hooks/use-farm-location-label";
 import { useDevice } from "@/features/devices/api/get-device";
 import { DeviceStatusCard } from "@/features/devices/components/device-status-card";
 import { DevicePairCard } from "@/features/devices/components/device-pair-card";
@@ -42,12 +43,16 @@ function PlotDeviceManager({ plotId }: { plotId: string }) {
 export default function PlotDetailPage({ params }: PageProps) {
   const { plotId } = use(params);
   const selectedFarm = useFarmStore((state) => state.selectedFarm);
+  const { label: locationLabel, coords, stationCode } = useFarmLocationLabel(selectedFarm);
 
   return (
     <PlotDetail
       farmId={selectedFarm?.id ?? null}
       plotId={plotId}
       deviceEl={<PlotDeviceManager plotId={plotId} />}
+      locationLabel={locationLabel}
+      coords={coords}
+      stationCode={stationCode}
     />
   );
 }

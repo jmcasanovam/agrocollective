@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useCrops, useSoils } from "../api/get-catalog";
-import type { Plot } from "../types";
+import { formatManagementProfile } from "../utils/labels";
+import type { Plot, PerformanceHistoryEntry } from "../types";
 
 interface MiniDevice {
   is_active: boolean;
@@ -13,9 +14,13 @@ interface MiniDevice {
 
 interface PlotCardProps {
   plot: Plot;
+  performance?: PerformanceHistoryEntry;
+  // Resuelto por el llamador (features/plots no puede importar de features/farms):
+  // ver PlotsList / la pagina de parcelas, que ya tienen la finca seleccionada.
+  locationLabel?: string | null;
 }
 
-export function PlotCard({ plot }: PlotCardProps) {
+export function PlotCard({ plot, performance, locationLabel }: PlotCardProps) {
   const { data: crops } = useCrops();
   const { data: soils } = useSoils();
 
@@ -73,6 +78,25 @@ export function PlotCard({ plot }: PlotCardProps) {
           {crop?.name ?? "no hay datos"} · {soil?.name ?? "no hay datos"} ·{" "}
           {plot.area_ha ? `${plot.area_ha} ha` : "no hay datos"}
         </div>
+        {locationLabel && (
+          <div className="text-[11px] text-[#9aa79d] flex items-center gap-1 mt-0.5">
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <path d="M12 22s7-7.58 7-13a7 7 0 1 0-14 0c0 5.42 7 13 7 13Z" />
+              <circle cx="12" cy="9" r="2.5" />
+            </svg>
+            {locationLabel}
+          </div>
+        )}
       </div>
 
       {/* Middle data columns */}
@@ -80,7 +104,7 @@ export function PlotCard({ plot }: PlotCardProps) {
         <div>
           <div className="text-[11px] text-[#9aa79d]">Perfil de riego</div>
           <div className="text-[13px] font-semibold text-[#3a4a42]">
-            {plot.management_profile || "Secano"}
+            {formatManagementProfile(plot.management_profile)}
           </div>
         </div>
         <div>
@@ -93,6 +117,19 @@ export function PlotCard({ plot }: PlotCardProps) {
 
       {/* Status badge + arrow */}
       <div className="ml-auto flex items-center gap-3.5">
+        {performance?.is_anomaly ? (
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#f8e5e2] text-[#b23a33]">
+            Anómala
+          </span>
+        ) : performance && performance.n_recommendations > 0 ? (
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#fbecd6] text-[#a8701e]">
+            {performance.n_recommendations} recomendación
+            {performance.n_recommendations === 1 ? "" : "es"}
+            {performance.n_high_priority > 0
+              ? ` · ${performance.n_high_priority} urgente${performance.n_high_priority === 1 ? "" : "s"}`
+              : ""}
+          </span>
+        ) : null}
         <span
           className={`text-[11.5px] font-semibold px-[11px] py-1 rounded-full ${
             hasDevice && isActive

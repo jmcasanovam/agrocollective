@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePlot } from "../api/get-plot";
 import { useCrops, useSoils } from "../api/get-catalog";
+import { formatManagementProfile } from "../utils/labels";
 import { PlotWeatherCard } from "./plot-weather-card";
 import { PlotSensorsCard } from "./plot-sensors-card";
 import { PlotIrrigationHarvestCard } from "./plot-irrigation-harvest-card";
@@ -11,9 +12,21 @@ interface PlotDetailProps {
   farmId: string | null;
   plotId: string;
   deviceEl?: React.ReactNode;
+  // Resueltos por el llamador (features/plots no puede importar de features/farms):
+  // ver app/(app)/plots/[plotId]/page.tsx, que ya tiene la finca seleccionada.
+  locationLabel?: string | null;
+  coords?: { lat: number; lon: number } | null;
+  stationCode?: string | null;
 }
 
-export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
+export function PlotDetail({
+  farmId,
+  plotId,
+  deviceEl,
+  locationLabel,
+  coords,
+  stationCode,
+}: PlotDetailProps) {
   const { data: plot, isLoading: isPlotLoading, isError } = usePlot({ farmId, plotId });
   const { data: crops } = useCrops();
   const { data: soils } = useSoils();
@@ -90,8 +103,21 @@ export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
                   Perfil de riego
                 </span>
                 <span className="text-sm font-semibold text-[#24302a]">
-                  {plot.management_profile || "Secano"}
+                  {formatManagementProfile(plot.management_profile)}
                 </span>
+              </div>
+              <div>
+                <span className="block text-[10px] text-[#6b7a70] uppercase font-bold">
+                  Ubicación
+                </span>
+                <span className="text-sm font-semibold text-[#24302a]">
+                  {locationLabel || "No especificada"}
+                </span>
+                {coords && (
+                  <span className="block text-[10.5px] text-[#9aa79d] font-mono">
+                    {coords.lat.toFixed(4)}, {coords.lon.toFixed(4)}
+                  </span>
+                )}
               </div>
               <div>
                 <span className="block text-[10px] text-[#6b7a70] uppercase font-bold">
@@ -120,7 +146,7 @@ export function PlotDetail({ farmId, plotId, deviceEl }: PlotDetailProps) {
           <PlotIrrigationHarvestCard plotId={plotId} />
 
           {/* SiAR Climate Records */}
-          <PlotWeatherCard plotId={plotId} />
+          <PlotWeatherCard plotId={plotId} stationCode={stationCode} />
         </div>
       </div>
     </div>
