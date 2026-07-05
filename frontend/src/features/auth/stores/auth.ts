@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { apiClient } from "@/lib/api-client";
 import { useFarmStore } from "@/features/farms/stores/farm";
-import { getQueryClient } from "@/lib/react-query";
+import { getQueryClient, getSiarPersister } from "@/lib/react-query";
 import type { User } from "../types";
 
 interface AuthState {
@@ -39,6 +39,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       getQueryClient().clear();
     } catch (e) {
       console.error("Error clearing query client on logout:", e);
+    }
+    try {
+      // El cache en memoria ya se borro arriba; esto borra tambien la copia
+      // persistida en localStorage (el clima SiAR de sesiones anteriores no
+      // debe sobrevivir a un logout, solo a un simple refresco de pagina).
+      void getSiarPersister().removeClient();
+    } catch (e) {
+      console.error("Error clearing SiAR cache on logout:", e);
     }
     try {
       useFarmStore.getState().clearSelectedFarm();
