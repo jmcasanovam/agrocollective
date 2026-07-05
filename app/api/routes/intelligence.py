@@ -224,12 +224,15 @@ def get_performance_history(
 )
 def get_plot_weather_history(
     plot_id: UUID,
+    year: int | None = Query(default=None, ge=2025, le=2100, description="Filtrar por año (requiere 'month')"),
+    month: int | None = Query(default=None, ge=1, le=12, description="Filtrar por mes (requiere 'year')"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Devuelve los últimos 30 días de registros climáticos SiAR de la estación
-    asociada a la parcela del usuario.
+    Devuelve los registros climáticos SiAR de la estación asociada a la
+    parcela del usuario. Sin filtro: últimos 30 días (más reciente primero).
+    Con year+month: todo ese mes natural (orden cronológico ascendente).
     """
     plot = _get_plot_or_404(db, plot_id, current_user.id)
     farm = plot.farm
@@ -253,9 +256,19 @@ def get_plot_weather_history(
     from app.database.influx import get_influx_client, get_query_api
     from app.core.config import settings
 
+    if year is not None and month is not None:
+        next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+        range_clause = f"start: {year:04d}-{month:02d}-01T00:00:00Z, stop: {next_year:04d}-{next_month:02d}-01T00:00:00Z"
+        sort_desc = "false"
+        limit_clause = "|> limit(n: 31)"
+    else:
+        range_clause = "start: 2025-06-01T00:00:00Z"
+        sort_desc = "true"
+        limit_clause = "|> limit(n: 30)"
+
     flux = f"""
     from(bucket: "{settings.INFLUXDB_BUCKET_WEATHER}")
-      |> range(start: 2025-06-01T00:00:00Z)
+      |> range({range_clause})
       |> filter(fn: (r) => r._measurement == "weather")
       |> filter(fn: (r) => r.siar_station_code == "{station_code}")
       |> pivot(
@@ -263,8 +276,8 @@ def get_plot_weather_history(
            columnKey: ["_field"],
            valueColumn: "_value"
          )
-      |> sort(columns: ["_time"], desc: true)
-      |> limit(n: 30)
+      |> sort(columns: ["_time"], desc: {sort_desc})
+      {limit_clause}
     """
 
     results = []

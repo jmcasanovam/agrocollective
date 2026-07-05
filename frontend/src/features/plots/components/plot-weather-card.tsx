@@ -1,16 +1,65 @@
 "use client";
 
-import { useState } from "react";
-import { usePlotWeather, type WeatherRecord } from "../api/get-plot-weather";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  usePlotWeather,
+  type WeatherMonthFilter,
+  type WeatherRecord,
+} from "../api/get-plot-weather";
+import { getSiarPersister } from "@/lib/react-query";
 import { CloudSunIcon } from "@/components/icons/card-icons";
 import { AlertPopup } from "@/components/ui/alert-popup";
 
 interface PlotWeatherCardProps {
   plotId: string;
+  // Resuelto por el llamador (features/plots no puede importar de features/farms):
+  // ver plot-detail.tsx / app/(app)/plots/[plotId]/page.tsx.
+  stationCode?: string | null;
 }
 
 const MAX_TODAY_ATTEMPTS = 5;
 const RETRY_INTERVAL_MS = 5000;
+
+// El cero no es positivo ni negativo: evita mostrar "-0" o "-0.0" cuando una
+// temperatura muy cercana a cero redondea a cero pero conserva el signo.
+function formatSigned(value: number, digits: number): string {
+  return value.toFixed(digits).replace(/^-0(\.0+)?$/, (m) => m.slice(1));
+}
+
+// La estacion SiAR solo tiene datos reales desde esta fecha (ver scripts/download_siar.py).
+const FIRST_AVAILABLE_MONTH = { year: 2025, month: 6 };
+
+const MONTH_LABELS = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+function availableMonths(): WeatherMonthFilter[] {
+  const now = new Date();
+  const months: WeatherMonthFilter[] = [];
+  let y = FIRST_AVAILABLE_MONTH.year;
+  let m = FIRST_AVAILABLE_MONTH.month;
+  while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
+    months.push({ year: y, month: m });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return months.reverse(); // mas reciente primero
+}
 
 function todayStr() {
   const now = new Date();
@@ -25,10 +74,13 @@ function hasTodayRecord(weather: WeatherRecord[] | null | undefined) {
   return weather.some((row) => row.date === today);
 }
 
-export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
+export function PlotWeatherCard({ plotId, stationCode = null }: PlotWeatherCardProps) {
   const [dismissed, setDismissed] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lastCountedUpdate, setLastCountedUpdate] = useState(0);
+  const [monthFilter, setMonthFilter] = useState<WeatherMonthFilter | null>(null);
+
+  const queryClient = useQueryClient();
 
   const {
     data: weather,
@@ -36,6 +88,8 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
     isError,
     dataUpdatedAt,
   } = usePlotWeather(plotId, {
+    stationCode,
+    filter: monthFilter,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (hasTodayRecord(data)) return false;
@@ -43,6 +97,13 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
       return RETRY_INTERVAL_MS;
     },
   });
+
+  const months = useMemo(() => availableMonths(), []);
+
+  const clearCache = () => {
+    queryClient.removeQueries({ queryKey: ["siar-weather"] });
+    void getSiarPersister().removeClient();
+  };
 
   const gotToday = hasTodayRecord(weather);
 
@@ -67,7 +128,8 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
     />
   );
 
-  const waitingForToday = !isLoading && !isError && weather && !gotToday && !exhaustedRetries;
+  const waitingForToday =
+    !monthFilter && !isLoading && !isError && weather && !gotToday && !exhaustedRetries;
 
   if (isLoading || waitingForToday) {
     return (
@@ -101,47 +163,85 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
     );
   }
 
-  const stationCode = weather[0]?.station_code || "N/D";
+  const displayStationCode = weather[0]?.station_code || stationCode || "N/D";
 
   return (
     <div className="bg-white border border-[#e7e2d6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 space-y-4">
       {stalePopup}
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-[#f0ece2] pb-3">
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[#f0ece2] pb-3">
         <div className="flex items-center gap-2">
           <CloudSunIcon className="w-[18px] h-[18px] text-[#3a4a42]" />
           <h3 className="text-sm font-bold text-[#24302a] m-0">
             Registros climáticos diario (SiAR)
           </h3>
         </div>
-        <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-[#f4f2eb] text-[#3a4a42]">
-          Estación: {stationCode}
-        </span>
+        <div className="flex items-center gap-2">
+          <select
+            value={monthFilter ? `${monthFilter.year}-${monthFilter.month}` : "recent"}
+            onChange={(e) => {
+              if (e.target.value === "recent") {
+                setMonthFilter(null);
+                return;
+              }
+              const [y, m] = e.target.value.split("-").map(Number);
+              setMonthFilter({ year: y, month: m });
+            }}
+            className="text-xs font-semibold text-[#3a4a42] bg-[#f4f2eb] border border-[#e7e2d6] rounded px-2 py-1 outline-none cursor-pointer"
+          >
+            <option value="recent">Últimos 30 días</option>
+            {months.map((m) => (
+              <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>
+                {MONTH_LABELS[m.month - 1]} {m.year}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={clearCache}
+            title="Vuelve a pedir los datos climáticos a la estación en vez de usar los guardados en esta sesión"
+            className="text-xs font-semibold text-[#6b7a70] bg-transparent border border-[#e7e2d6] rounded px-2 py-1 cursor-pointer hover:bg-[#f4f2eb]"
+          >
+            Vaciar caché
+          </button>
+          <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-[#f4f2eb] text-[#3a4a42]">
+            Estación: {displayStationCode}
+          </span>
+        </div>
       </div>
 
       {/* Table container */}
       <div className="overflow-x-auto max-h-[300px] overflow-y-auto pr-1">
         <table className="w-full text-left border-collapse text-xs">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-white">
             <tr className="border-b border-[#f0ece2] text-[#6b7a70]">
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider">Fecha</th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider">Fecha</th>
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
                 Temp. (°C)
               </th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
                 Mín/Máx
               </th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
                 Hum. (%)
               </th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
                 Hum. Mín/Máx
               </th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
                 Lluvia (mm)
               </th>
-              <th className="pb-2 font-bold uppercase text-[9px] tracking-wider text-center">
-                ETo (mm/d)
+              <th className="pb-2 bg-white font-bold uppercase text-[9px] tracking-wider text-center">
+                <span className="relative group inline-flex items-center gap-1 cursor-help border-b border-dotted border-[#9aa79d]">
+                  ETo (mm/d)
+                  {/* Se abre hacia abajo (no hacia arriba): el header es "sticky top-0" dentro
+                      de un contenedor con scroll, así que no hay espacio visible por encima. */}
+                  <span className="pointer-events-none absolute top-full right-0 mt-2 w-56 rounded-lg bg-[#24302a] text-white text-[10.5px] normal-case tracking-normal font-normal p-2.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-30">
+                    <strong className="block mb-1">Evapotranspiración de referencia (ETo)</strong>
+                    Agua que pierde un cultivo de referencia por evaporación y transpiración en un
+                    día, medida en mm/día. Cuanto más alta, más riego hace falta para compensarla.
+                  </span>
+                </span>
               </th>
             </tr>
           </thead>
@@ -155,12 +255,12 @@ export function PlotWeatherCard({ plotId }: PlotWeatherCardProps) {
                   })}
                 </td>
                 <td className="py-2.5 text-center text-[#24302a] font-semibold">
-                  {row.air_temp !== null ? `${row.air_temp.toFixed(1)}°` : "no hay datos"}
+                  {row.air_temp !== null ? `${formatSigned(row.air_temp, 1)}°` : "no hay datos"}
                 </td>
                 <td className="py-2.5 text-center text-[#6b7a70]">
                   {row.air_temp_min !== null && row.air_temp_max !== null ? (
                     <span>
-                      {row.air_temp_min.toFixed(0)}° / {row.air_temp_max.toFixed(0)}°
+                      {formatSigned(row.air_temp_min, 0)}° / {formatSigned(row.air_temp_max, 0)}°
                     </span>
                   ) : (
                     "no hay datos"
