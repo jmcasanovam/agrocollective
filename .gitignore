@@ -115,7 +115,6 @@ site
 
 # IDEs and editors
 .idea/
-.vscode/
 *.sublime-workspace
 *.sublime-project
 
@@ -169,5 +168,8 @@ outliers_ground_truth.jsonl
 # Frontend unignores
 !frontend/src/lib/
 !frontend/.env.example
+
+# Claude Code project config (local only, not shared)
+.claude/
 
 

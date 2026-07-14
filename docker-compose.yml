@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: docker/frontend/Dockerfile
-      target: dev
+      target: final
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
 
@@ -17,15 +17,8 @@ services:
       - .env
 
     environment:
-      APP_ENV: ${APP_ENV:-production}
+      APP_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      WATCHPACK_POLLING: "true"
-      CHOKIDAR_USEPOLLING: "true"
-
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
 
     depends_on:
       - backend
