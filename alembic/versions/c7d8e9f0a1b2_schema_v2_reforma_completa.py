@@ -5,10 +5,10 @@ Revises: 6fc335ef3267
 Create Date: 2026-06-27
 
 Estado real v1 (tras las 8 migraciones previas):
-  users    — id, email, password_hash, region (texto), is_active, created_at, updated_at
-  farms    — id, user_id, name(255 NOT NULL), latitude, longitude, province, area_ha(NOT NULL), is_active, created_at, updated_at
-  plots    — id, farm_id, crop_type(100 NOT NULL), soil_type(100 NOT NULL), area_ha(NOT NULL), depth_cm, province, name(100 NOT NULL), is_active, created_at, updated_at
-  sensors  — id, plot_id, esp32_id(100), sensor_type(50), depth_cm, status(20 NOT NULL), battery_mv, last_reading, is_active, created_at, updated_at
+  users    : id, email, password_hash, region (texto), is_active, created_at, updated_at
+  farms    : id, user_id, name(255 NOT NULL), latitude, longitude, province, area_ha(NOT NULL), is_active, created_at, updated_at
+  plots    : id, farm_id, crop_type(100 NOT NULL), soil_type(100 NOT NULL), area_ha(NOT NULL), depth_cm, province, name(100 NOT NULL), is_active, created_at, updated_at
+  sensors  : id, plot_id, esp32_id(100), sensor_type(50), depth_cm, status(20 NOT NULL), battery_mv, last_reading, is_active, created_at, updated_at
 
 Cambios v1→v2:
   - Crea: regions, crops, soils, irrigation_records, harvests
@@ -96,7 +96,7 @@ def upgrade() -> None:
     op.add_column('plots', sa.Column('crop_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('plots', sa.Column('soil_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('plots', sa.Column('hash_plot', sa.String(64), nullable=True))
-    op.add_column('plots', sa.Column('management_profile', sa.String(20), nullable=True))
+    op.add_column('plots', sa.Column('management_profile', sa.String(150), nullable=True))
     op.create_foreign_key('fk_plots_crop_id', 'plots', 'crops', ['crop_id'], ['id'])
     op.create_foreign_key('fk_plots_soil_id', 'plots', 'soils', ['soil_id'], ['id'])
     op.drop_column('plots', 'crop_type')

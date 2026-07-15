@@ -13,7 +13,7 @@
 - Cada finca puede tener múltiples parcelas con cultivo, tipo de suelo y perfil de gestión.
 
 ### RF-03 · Dispositivos IoT
-- Cada parcela puede tener un dispositivo (nodo ESP32) registrado.
+- Cada parcela puede tener como máximo un dispositivo (nodo ESP32) registrado, forzado por `uq_device_plot_id` (constraint de BD) y verificado en `device_service.create` (409 si ya existe uno).
 - Un dispositivo tiene asociado un array de sensores de la plataforma.
 - Todos los dispositivos comparten el mismo catálogo de sensores (compatibilidad de plataforma).
 
@@ -23,9 +23,9 @@
 - El catálogo puede ampliarse sin modificar el código del firmware.
 
 ### RF-05 · Ingesta de mediciones
-- Las mediciones llegan por MQTT en el tópico `fincas/{finca_id}/parcelas/{parcela_id}/lecturas`.
+- Las mediciones llegan por MQTT en el tópico `devices/{device_code}/readings` (identificado por código de dispositivo, no por finca/parcela).
 - El worker `mqtt_consumer.py` procesa y almacena cada mensaje en InfluxDB.
-- Las mediciones incluyen: temperatura aire, temperatura suelo, humedad relativa, humedad suelo, batería y profundidad.
+- Las mediciones incluyen: temperatura aire, temperatura suelo, humedad relativa del aire, humedad del suelo y batería.
 
 ### RF-06 · Catálogo de referencia
 - El sistema mantiene tablas de referencia para cultivos, tipos de suelo y regiones.

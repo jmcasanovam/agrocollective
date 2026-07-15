@@ -1,5 +1,28 @@
 services:
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      target: final
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+
+    container_name: agro_frontend
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env
+
+    environment:
+      APP_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+
+    depends_on:
+      - backend
+
   backend:
     build:
       context: .
@@ -36,6 +59,34 @@ services:
       fi
       "
 
+  simulator:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+
+    container_name: agro_simulator
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_HOST: postgres
+      INFLUXDB_HOST: influxdb
+      MQTT_HOST: mosquitto
+
+    volumes:
+      - .:/app
+
+    command: ["python", "scripts/live_sensor_publisher.py"]
+
+    depends_on:
+      - backend
+      - mosquitto
+      - influxdb
+      - postgres
+
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
 
@@ -65,6 +116,14 @@ services:
 
     volumes:
       - influxdb_data:/var/lib/influxdb2
+
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_INIT_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD:-admin_password_123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-agrocollective}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET_WEATHER:-agrocollective_siar}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-my-super-secret-influxdb-token-for-dev-123}
 
   mosquitto:
     image: eclipse-mosquitto:2

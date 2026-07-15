@@ -23,9 +23,13 @@ class Settings(BaseSettings):
     # InfluxDB
     INFLUXDB_HOST: str
     INFLUXDB_PORT: int
+    # Usuario y contraseña del admin inicial (solo usados por el contenedor de InfluxDB)
+    INFLUXDB_INIT_USERNAME: str = "admin"
+    INFLUXDB_INIT_PASSWORD: str = "admin_password_123"
     INFLUXDB_TOKEN: str
     INFLUXDB_ORG: str
-    INFLUXDB_BUCKET: str
+    INFLUXDB_BUCKET_WEATHER: str
+    INFLUXDB_BUCKET_MEASUREMENTS: str
 
     # MQTT
     MQTT_HOST: str

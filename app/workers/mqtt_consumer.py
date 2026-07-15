@@ -1,5 +1,5 @@
 """
-MQTT Consumer — Fase 1
+MQTT Consumer: Fase 1
 Suscribe al broker Mosquitto y procesa lecturas de dispositivos IoT.
 Tópico: devices/{device_code}/readings
 

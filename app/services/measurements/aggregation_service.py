@@ -73,7 +73,7 @@ class AggregationService:
         aggregates = PlotAggregates(plot_id=plot.id, hash_plot=plot.hash_plot or "")
 
         if not plot.hash_plot:
-            logger.warning("Parcela %s sin hash_plot — omitida.", plot.id)
+            logger.warning("Parcela %s sin hash_plot. Omitida.", plot.id)
             return aggregates
 
         since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -103,7 +103,7 @@ class AggregationService:
         """Consulta InfluxDB y rellena las medias de los campos de sensor."""
         since_rfc = since.strftime("%Y-%m-%dT%H:%M:%SZ")
         flux = f"""
-            from(bucket: "{settings.INFLUXDB_BUCKET}")
+            from(bucket: "{settings.INFLUXDB_BUCKET_MEASUREMENTS}")
               |> range(start: {since_rfc})
               |> filter(fn: (r) => r._measurement == "{Measurements.SENSORS}")
               |> filter(fn: (r) => r.hash_plot == "{agg.hash_plot}")

@@ -1,4 +1,4 @@
-# Simulación paso a paso — 10 parcelas, 4 horas, medición cada 15 min
+# Simulación paso a paso: 10 parcelas, 4 horas, medición cada 15 min
 
 Este documento sigue el recorrido completo de los datos desde el primer mensaje MQTT hasta las recomendaciones finales, usando un escenario concreto como ejemplo.
 
@@ -16,9 +16,9 @@ Este documento sigue el recorrido completo de los datos desde el primer mensaje 
 
 ---
 
-## Parte 1 — Captura de datos en tiempo real (Fases 1 y 2)
+## Parte 1: Captura de datos en tiempo real (Fases 1 y 2)
 
-### 08:00:00 — Primer mensaje
+### 08:00:00 - Primer mensaje
 
 El sensor de la parcela P1 publica en Mosquitto:
 
@@ -46,7 +46,7 @@ Topic: devices/AGRO-P1-001/readings
 4. **Actualiza PostgreSQL** → `devices.last_seen_at = 08:00:00`, `devices.battery_mv = 3820`.
 5. **Escribe en InfluxDB** → measurement `sensor_readings`, tag `hash_plot = abc123...`, fields: `soil_humidity=42.3`, `air_temp=18.1`, `soil_temp=16.4`, `relative_humidity=71.2`.
 
-### 08:15:00 — Segundo intervalo (10 mensajes en ~1 s)
+### 08:15:00 - Segundo intervalo (10 mensajes en ~1 s)
 
 Los 10 sensores publican casi simultáneamente. El broker los encola; el consumer los procesa uno a uno en el hilo MQTT.
 
@@ -63,9 +63,9 @@ Los 10 sensores publican casi simultáneamente. El broker los encola; el consume
 | P9 | 85.2 ⚠ | 19.0 | 17.2 | 69.1 |  ← P9 acaba de recibir riego
 | P10 | 43.6 | 18.2 | 16.3 | 72.8 |
 
-La parcela P9 tiene `soil_humidity = 85.2`, muy por encima del resto. En este momento el sistema **no detecta nada inusual** — simplemente almacena el dato. La detección ocurrirá en el pipeline nocturno.
+La parcela P9 tiene `soil_humidity = 85.2`, muy por encima del resto. En este momento el sistema **no detecta nada inusual**. Simplemente almacena el dato. La detección ocurrirá en el pipeline nocturno.
 
-### 12:00:00 — Última lectura
+### 12:00:00 - Última lectura
 
 Tras 4 horas y 17 ciclos, InfluxDB acumula **170 puntos** (17 × 10 parcelas).
 
@@ -78,13 +78,13 @@ Tras 4 horas y 17 ciclos, InfluxDB acumula **170 puntos** (17 × 10 parcelas).
 
 ---
 
-## Parte 2 — Pipeline nocturno (02:00 UTC del día siguiente)
+## Parte 2: Pipeline nocturno (02:00 UTC del día siguiente)
 
 El scheduler lanza `clustering_worker.run_pipeline()`.
 
 ---
 
-### Fase 3 — Variables agregadas (ventana = 30 días)
+### Fase 3: Variables agregadas (ventana = 30 días)
 
 Para cada parcela se calculan medias sobre la ventana completa. En este ejemplo, solo hay 4 horas de datos, pero el sistema funciona igual:
 
@@ -105,7 +105,7 @@ P9 destaca claramente: máxima humedad, máxima frecuencia de riego, mínima efi
 
 ---
 
-### Fase 4 — Clustering K-Means (k=3)
+### Fase 4: Clustering K-Means (k=3)
 
 El algoritmo normaliza las 9 features y agrupa las parcelas por similitud:
 
@@ -119,7 +119,7 @@ Cada parcela queda asociada a su cluster con una distancia al centroide. P9 pert
 
 ---
 
-### Fase 5 — Detección de anomalías LOF
+### Fase 5: Detección de anomalías LOF
 
 LOF se ejecuta dentro de cada cluster.
 
@@ -127,16 +127,16 @@ LOF se ejecuta dentro de cada cluster.
 
 | Parcela | LOF score | ¿Anómala? | Features anómalas |
 |---|---|---|---|
-| P2 | 1.12 | No | — |
-| P4 | 1.08 | No | — |
-| P7 | 1.19 | No | — |
+| P2 | 1.12 | No | - |
+| P4 | 1.08 | No | - |
+| P7 | 1.19 | No | - |
 | P9 | **2.34** | **Sí** | `avg_soil_humidity`, `total_water_mm` |
 
 P9 es la única anómala del sistema esta noche.
 
 ---
 
-### Fase 6 — Análisis causal
+### Fase 6: Análisis causal
 
 Para P9, feature anómala: `avg_soil_humidity`.
 
@@ -155,7 +155,7 @@ r(soil_humidity, air_humidity)   = +0.34
 
 ---
 
-### Fase 7 — Parcelas análogas
+### Fase 7: Parcelas análogas
 
 Para cada parcela se buscan las 5 más cercanas en el espacio normalizado. Para P9 (anómala):
 
@@ -171,7 +171,7 @@ P1 y P8 son análogas fuera del cluster: son parcelas con valores similares en t
 
 ---
 
-### Fase 8 — Predicción ML (Random Forest)
+### Fase 8: Predicción ML (Random Forest)
 
 Con 10 parcelas y cosechas registradas para todas, hay suficientes muestras para entrenar:
 
@@ -191,7 +191,7 @@ El modelo ha aprendido de P3 y P6 (cluster 1) que con sus condiciones climática
 
 ---
 
-### Fase 9 — Recomendaciones para P9
+### Fase 9: Recomendaciones para P9
 
 Se generan 3 recomendaciones:
 
@@ -209,7 +209,7 @@ Se generan 3 recomendaciones:
 
 ---
 
-### Fase 10 — Historial de rendimiento
+### Fase 10: Historial de rendimiento
 
 Se guarda en `plot_performance_history` un registro para cada una de las 10 parcelas con `run_date = 2026-07-01`:
 

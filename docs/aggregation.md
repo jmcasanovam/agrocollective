@@ -16,7 +16,7 @@ El proceso se ejecuta sobre todas las parcelas activas (con `hash_plot` generado
 | `avg_air_temp` | InfluxDB `measurements` | Media ventana | °C |
 | `avg_soil_temp` | InfluxDB `measurements` | Media ventana | °C |
 | `avg_air_humidity` | InfluxDB `measurements` | Media ventana | % |
-| `irrigation_frequency` | PostgreSQL `irrigation_records` | Nº de registros en la ventana | — |
+| `irrigation_frequency` | PostgreSQL `irrigation_records` | Nº de registros en la ventana | - |
 | `avg_irrigation_mm` | PostgreSQL `irrigation_records` | Media de mm/riego | mm |
 | `total_water_mm` | PostgreSQL `irrigation_records` | Suma total en la ventana | mm |
 | `yield_kg_ha` | PostgreSQL `harvests` | Última cosecha disponible | kg/ha |
@@ -87,12 +87,12 @@ python -m app.workers.clustering_worker 7
 ### Salida esperada
 
 ```
-INFO — === Inicio pipeline clustering | 2026-06-29T18:56:22Z ===
-INFO — Parcelas a procesar: 3
-INFO — [1/3] Parcela 2e8d557a... | hum=45.2 air=22.1 riego=4 total_mm=180.0 yield=4200.0 eff=2.3333
-INFO — [2/3] Parcela a1b2c3d4... | hum=38.7 air=21.8 riego=3 total_mm=120.0 yield=— eff=—
-INFO — [3/3] Parcela ff1122ab... | hum=51.0 air=23.4 riego=5 total_mm=240.0 yield=3800.0 eff=1.5833
-INFO — === Fase 3 completada | 3/3 parcelas | 0.8s ===
+INFO - === Inicio pipeline clustering | 2026-06-29T18:56:22Z ===
+INFO - Parcelas a procesar: 3
+INFO - [1/3] Parcela 2e8d557a... | hum=45.2 air=22.1 riego=4 total_mm=180.0 yield=4200.0 eff=2.3333
+INFO - [2/3] Parcela a1b2c3d4... | hum=38.7 air=21.8 riego=3 total_mm=120.0 yield=None eff=None
+INFO - [3/3] Parcela ff1122ab... | hum=51.0 air=23.4 riego=5 total_mm=240.0 yield=3800.0 eff=1.5833
+INFO - === Fase 3 completada | 3/3 parcelas | 0.8s ===
 ```
 
 ---
@@ -113,7 +113,7 @@ INFLUXDB_TOKEN=tu_token_aqui
 
 4. Reinicia el backend: `docker-compose restart backend`
 
-> El worker continúa funcionando aunque InfluxDB falle — los campos de sensor quedan a `None` pero los datos de PostgreSQL (riego, cosechas) se calculan igualmente.
+> El worker continúa funcionando aunque InfluxDB falle: los campos de sensor quedan a `None` pero los datos de PostgreSQL (riego, cosechas) se calculan igualmente.
 
 ### Datos mínimos para ver variables completas
 

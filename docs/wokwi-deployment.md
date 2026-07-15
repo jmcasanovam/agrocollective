@@ -51,13 +51,13 @@ Wokwi carga automáticamente todos los archivos de la carpeta cuando se abre el 
 
 ## 3. Requisitos previos
 
-### Opción A — Wokwi web (recomendado para pruebas rápidas)
+### Opción A: Wokwi web (recomendado para pruebas rápidas)
 
 1. Crear cuenta gratuita en [wokwi.com](https://wokwi.com).
 2. Crear un nuevo proyecto de tipo **ESP32**.
 3. Reemplazar los ficheros del proyecto con los de la carpeta `wokwi/`.
 
-### Opción B — Extensión VSCode
+### Opción B: Extensión VSCode
 
 1. Instalar la extensión [Wokwi for VS Code](https://marketplace.visualstudio.com/items?itemName=wokwi.wokwi-vscode).
 2. Abrir la carpeta `wokwi/` en VS Code.
@@ -209,7 +209,7 @@ El firmware implementa un pipeline de tres etapas antes de enviar datos al broke
 [Buffer] airTemp= 2/15  soilTemp= 2/15  hum= 2/15
 ...
 [Buffer] airTemp=15/15  soilTemp=15/15  hum=15/15
-[Proceso] Buffers llenos — preprocesando...
+[Proceso] Buffers llenos - preprocesando...
 [Medias] airTemp=23.10  soilTemp=19.80  relHum=61.40  soilHum=46.30
 [F001/P001] (OK) {"finca_id":"F001","parcela_id":"P001",...}
 ...
@@ -249,7 +249,7 @@ El firmware implementa un pipeline de tres etapas antes de enviar datos al broke
 ## 8. Flujo de datos hasta el backend
 
 ```
-[Wokwi — ESP32]
+[Wokwi - ESP32]
     │  MQTT publish
     │  Tópico: fincas/{finca_id}/parcelas/{parcela_id}/lecturas
     │  Payload: JSON (ver abajo)
@@ -307,7 +307,7 @@ mosquitto_sub -h broker.hivemq.com -p 1883 -t "fincas/#"
 Para que el ESP32 simulado envíe datos al backend de Docker Compose, cambiar el broker en `sketch.ino`:
 
 ```cpp
-// Sustituir por la IP de la máquina host (no "localhost" — Wokwi es remoto)
+// Sustituir por la IP de la máquina host (no "localhost" - Wokwi es remoto)
 const char* MQTT_BROKER = "YOUR_HOST_IP";
 const int   MQTT_PORT   = 1883;
 ```
@@ -333,14 +333,14 @@ Flota: 10 parcelas | Buffer: 15 muestras | Intervalo: 60 s
 
 [WiFi] Conectando a 'Wokwi-GUEST'...
 ..
-[WiFi] OK — IP: 10.10.0.5
+[WiFi] OK - IP: 10.10.0.5
 [MQTT] Conectando a broker.hivemq.com:1883...
 [MQTT] Conectado
 [Buffer] airTemp= 1/15  soilTemp= 1/15  hum= 1/15
 [Buffer] airTemp= 2/15  soilTemp= 2/15  hum= 2/15
 ...
 [Buffer] airTemp=15/15  soilTemp=15/15  hum=15/15
-[Proceso] Buffers llenos — preprocesando...
+[Proceso] Buffers llenos - preprocesando...
 [Medias] airTemp=23.10  soilTemp=19.80  relHum=61.40  soilHum=46.30
 [F001/P001] (OK) {"finca_id":"F001","parcela_id":"P001","esp32_id":"ESP-P001","timestamp":"2025-05-01T03:00:00Z","soil_humidity":46.6,"soil_temp":19.6,"air_temp":21.3,"relative_humidity":62.8,"battery_mv":4198,"depth_cm":30}
 ...

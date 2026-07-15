@@ -7,9 +7,16 @@ Flujo:
   - Para clusters con < 2 miembros no se puede ejecutar LOF (no hay comparación posible).
   - Identifica qué features concretas se desvían más del centro del cluster.
 
+Solo se evalúan variables medidas por los sensores IoT (humedad/temperatura de
+suelo y aire). Riego y rendimiento los introduce el propio agricultor a mano,
+así que una desviación ahí no es una "anomalía" (posible fallo de sensor o
+condición ambiental atípica), es una diferencia de manejo respecto a otras
+parcelas: eso ya lo cubre la categoría "benchmark" de las recomendaciones
+(Fase 9), no debe mezclarse con la detección de anomalías de sensor.
+
 Parámetros .env:
   LOF_N_NEIGHBORS = 5    (se reduce si hay menos miembros en el cluster)
-  LOF_THRESHOLD   = 1.5  (scores > umbral → anomalía)
+  LOF_THRESHOLD   = 1.5  (scores > umbral -> anomalía)
 """
 
 import logging
@@ -21,9 +28,18 @@ from sklearn.neighbors import LocalOutlierFactor
 
 from app.core.config import settings
 from app.services.measurements.aggregation_service import PlotAggregates
-from app.services.clustering.kmeans_service import ClusteringResult, FEATURE_COLUMNS
+from app.services.clustering.kmeans_service import ClusteringResult
 
 logger = logging.getLogger(__name__)
+
+# Subconjunto de FEATURE_COLUMNS que proviene realmente de sensores IoT (no de
+# datos introducidos a mano por el agricultor como riego o cosecha).
+SENSOR_FEATURE_COLUMNS = [
+    "avg_soil_humidity",
+    "avg_air_temp",
+    "avg_soil_temp",
+    "avg_air_humidity",
+]
 
 # Desviación estándar mínima respecto al centro del cluster para marcar una feature
 _FEATURE_DEVIATION_THRESHOLD = 1.5
@@ -38,6 +54,11 @@ class AnomalyResult:
     lof_score: float
     is_anomaly: bool
     anomalous_features: list[str] = field(default_factory=list)
+    # Direccion de la desviacion por feature ("alto"/"bajo" respecto al centroide
+    # del cluster): solo se usa en memoria para redactar recomendaciones mas
+    # concretas en la misma ejecucion del pipeline (Fase 9); no se persiste en
+    # plot_anomalies, que sigue guardando unicamente los nombres de feature.
+    feature_directions: dict[str, str] = field(default_factory=dict)
 
 
 class LOFService:
@@ -98,15 +119,15 @@ class LOFService:
         aggs = [agg_by_id[pid] for pid in plot_ids if pid in agg_by_id]
 
         if len(aggs) != n:
-            logger.warning("Cluster %d: %d parcelas sin agregados — omitidas.", cluster_id, n - len(aggs))
+            logger.warning("Cluster %d: %d parcelas sin agregados, omitidas.", cluster_id, n - len(aggs))
             n = len(aggs)
             plot_ids = [str(a.plot_id) for a in aggs]
             hash_plots = [a.hash_plot for a in aggs]
 
-        X = np.array([[float(getattr(agg, col) or 0) for col in FEATURE_COLUMNS] for agg in aggs])
+        X = np.array([[float(getattr(agg, col) or 0) for col in SENSOR_FEATURE_COLUMNS] for agg in aggs])
 
         if n < 2:
-            # Con 1 sola parcela no hay comparación posible — score neutro
+            # Con 1 sola parcela no hay comparación posible, score neutro
             logger.debug("Cluster %d: solo %d parcela, LOF omitido.", cluster_id, n)
             return [
                 AnomalyResult(
@@ -135,7 +156,9 @@ class LOFService:
         for i, agg in enumerate(aggs):
             score = float(scores[i])
             is_anomaly = score > settings.LOF_THRESHOLD
-            anomalous_features = self._detect_anomalous_features(X[i], centroid, std) if is_anomaly else []
+            anomalous_features, feature_directions = (
+                self._detect_anomalous_features(X[i], centroid, std) if is_anomaly else ([], {})
+            )
 
             if is_anomaly:
                 logger.info(
@@ -151,6 +174,7 @@ class LOFService:
                 lof_score=round(score, 6),
                 is_anomaly=is_anomaly,
                 anomalous_features=anomalous_features,
+                feature_directions=feature_directions,
             ))
 
         return results
@@ -158,18 +182,21 @@ class LOFService:
     @staticmethod
     def _detect_anomalous_features(
         row: np.ndarray, centroid: np.ndarray, std: np.ndarray
-    ) -> list[str]:
+    ) -> tuple[list[str], dict[str, str]]:
         """
         Identifica features cuyo valor se desvía más de _FEATURE_DEVIATION_THRESHOLD
-        desviaciones estándar respecto al centroide del cluster.
+        desviaciones estándar respecto al centroide del cluster, y en qué sentido
+        ("alto" o "bajo") se desvía cada una.
         """
         anomalous = []
-        for j, col in enumerate(FEATURE_COLUMNS):
+        directions: dict[str, str] = {}
+        for j, col in enumerate(SENSOR_FEATURE_COLUMNS):
             if std[j] > 0:
-                deviation = abs(row[j] - centroid[j]) / std[j]
-                if deviation >= _FEATURE_DEVIATION_THRESHOLD:
+                deviation = (row[j] - centroid[j]) / std[j]
+                if abs(deviation) >= _FEATURE_DEVIATION_THRESHOLD:
                     anomalous.append(col)
-        return anomalous
+                    directions[col] = "alto" if deviation > 0 else "bajo"
+        return anomalous, directions
 
 
 lof_service = LOFService()

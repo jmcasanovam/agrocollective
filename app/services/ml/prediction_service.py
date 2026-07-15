@@ -145,7 +145,7 @@ class PredictionService:
 
         if n_train < settings.ML_MIN_SAMPLES:
             logger.info(
-                "[Fase 8] Target '%s': solo %d muestras con valor (mínimo %d) — predicción omitida.",
+                "[Fase 8] Target '%s': solo %d muestras con valor (mínimo %d). Predicción omitida.",
                 target, n_train, settings.ML_MIN_SAMPLES,
             )
             return results

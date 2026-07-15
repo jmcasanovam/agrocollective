@@ -1,4 +1,4 @@
-# Fase 1: Flujo MQTT — Dispositivo a Backend
+# Fase 1: Flujo MQTT - Dispositivo a Backend
 
 ## Descripción general
 

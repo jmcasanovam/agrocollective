@@ -23,9 +23,9 @@ from datetime import date, timedelta
 # =============================================================================
 
 API_BASE_URL  = "http://localhost:8000"
-USER_EMAIL    = "simulacion@agrocollective.com"
+USER_EMAILS   = [f"simulacion{i}@agrocollective.com" for i in range(5)]
 USER_PASSWORD = "Simul2026!"
-N_PLOTS       = 10
+N_PLOTS       = 100
 DEVICE_PREFIX = "AGRO-P"
 RANDOM_SEED   = 42
 
@@ -65,16 +65,8 @@ SOIL_IDS = [
 
 # Management profile por parcela (espejo de simulate_sensors.py PROFILE_DISTRIBUTION)
 MANAGEMENT_PROFILES = [
-    "seco_eficiente",   # P00 Valencia
-    "moderado",         # P01 Valencia
-    "moderado",         # P02 Valencia
-    "seco_eficiente",   # P03 Valencia
-    "humedo_intensivo", # P04 Valencia
-    "moderado",         # P05 Baza
-    "seco_eficiente",   # P06 Baza
-    "humedo_intensivo", # P07 Baza
-    "moderado",         # P08 Baza
-    "humedo_intensivo", # P09 Baza
+    "seco_eficiente" if (i % 3 == 0) else "moderado" if (i % 3 == 1) else "humedo_intensivo"
+    for i in range(100)
 ]
 
 # Riego por profile (freq veces/semana, mm/riego)
@@ -92,6 +84,7 @@ HARVEST_DATE_BY_CROP_IDX = {
     2: date(2025, 9, 25),   # vina:     cosecha sep
 }
 
+# Ventana de simulación (se determina dinámicamente si InfluxDB tiene datos)
 SIM_START = date(2025, 7, 1)
 SIM_END   = date(2026, 6, 30)
 
@@ -128,37 +121,114 @@ def _psql(sql: str) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 def _psql_rows(sql: str) -> list[list[str]]:
-    out = _psql(sql)
-    rows = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if parts and parts[0]:
-            rows.append(parts)
-    return rows
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            result = db.execute(text(sql))
+            return [[str(val) for val in row] for row in result.all()]
+        finally:
+            db.close()
+    except Exception:
+        out = _psql(sql)
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if parts and parts[0]:
+                rows.append(parts)
+        return rows
 
 # =============================================================================
-# PASO 0 — Resolver region_ids
+# PASO 0: Resolver region_ids
 # =============================================================================
 
-def get_region_ids() -> dict[str, str]:
-    """Returns {region_code: region_uuid}. Fails if seed_data.py no corrió."""
-    rows = _psql_rows(
-        "SELECT code, id::text FROM regions WHERE code IN ('VALENCIA','BAZA');"
-    )
-    mapping = {r[0]: r[1] for r in rows if len(r) == 2}
+def wipe_existing_data():
+    """Wipes all operational tables in PostgreSQL to start fresh."""
+    step("Wiping existing operational data in Postgres")
+    sql = "TRUNCATE TABLE users, farms, plots, devices, irrigation_records, harvests CASCADE;"
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text(sql))
+            db.commit()
+            ok("Postgres tables wiped successfully.")
+        finally:
+            db.close()
+    except Exception:
+        # Fallback to docker exec psql
+        import subprocess
+        subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql],
+            capture_output=True
+        )
+        ok("Postgres tables wiped via fallback.")
+
+
+def wipe_influxdb_measurements():
+    """Wipes all sensor readings from InfluxDB measurements bucket."""
+    step("Wiping existing sensor readings in InfluxDB")
+    import os
+    try:
+        from influxdb_client import InfluxDBClient
+    except ImportError:
+        warn("influxdb_client not installed. Skipping InfluxDB wipe.")
+        return
+
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_MEASUREMENTS"]
+    if any(not os.getenv(k) for k in required):
+        warn("Missing InfluxDB env vars. Skipping InfluxDB wipe.")
+        return
+
+    url = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token = os.environ["INFLUXDB_TOKEN"]
+    org = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_MEASUREMENTS"]
+    
+    try:
+        client = InfluxDBClient(url=url, token=token, org=org, timeout=5000)
+        try:
+            client.delete_api().delete(
+                start="1970-01-01T00:00:00Z",
+                stop="2030-01-01T00:00:00Z",
+                predicate='_measurement="measurements"',
+                bucket=bucket,
+                org=org
+            )
+            ok("InfluxDB measurements bucket wiped.")
+        finally:
+            client.close()
+    except Exception as e:
+        warn(f"Failed to wipe InfluxDB: {e}")
+
+
+def get_region_ids(client) -> dict[str, str]:
+    """Returns {region_code: region_uuid} via API."""
+    r = client.get(f"{API_BASE_URL}/regions")
+    if r.status_code != 200:
+        bail("Error fetching regions from API", r)
+    data = r.json()
+    mapping = {item["code"]: item["id"] for item in data if item["code"] in ("VALENCIA", "BAZA")}
     if len(mapping) < 2:
         bail(
-            f"Regiones VALENCIA/BAZA no encontradas en BD. "
+            f"Regiones VALENCIA/BAZA no encontradas en catálogo de la API. "
             f"Ejecuta primero: python scripts/seed_data.py. "
             f"Encontradas: {list(mapping.keys())}"
         )
     return mapping
 
 
-def get_crop_ids() -> list[str]:
-    """Returns [olivo, almendro, vina] UUID strings in order."""
-    rows = _psql_rows("SELECT id::text, name FROM crops;")
-    crop_map = {r[1]: r[0] for r in rows if len(r) == 2}
+def get_crop_ids(client) -> list[str]:
+    """Returns [olivo, almendro, vina] UUID strings in order via API."""
+    r = client.get(f"{API_BASE_URL}/crops")
+    if r.status_code != 200:
+        bail("Error fetching crops from API", r)
+    data = r.json()
+    crop_map = {item["name"]: item["id"] for item in data}
     return [
         crop_map.get("olivo"),
         crop_map.get("almendro"),
@@ -166,10 +236,13 @@ def get_crop_ids() -> list[str]:
     ]
 
 
-def get_soil_ids() -> list[str]:
-    """Returns [arenoso, franco, arcilloso, franco-arenoso, franco-arcilloso] UUID strings in order."""
-    rows = _psql_rows("SELECT id::text, name FROM soils;")
-    soil_map = {r[1]: r[0] for r in rows if len(r) == 2}
+def get_soil_ids(client) -> list[str]:
+    """Returns [arenoso, franco, arcilloso, franco-arenoso, franco-arcilloso] UUID strings in order via API."""
+    r = client.get(f"{API_BASE_URL}/soils")
+    if r.status_code != 200:
+        bail("Error fetching soils from API", r)
+    data = r.json()
+    soil_map = {item["name"]: item["id"] for item in data}
     return [
         soil_map.get("arenoso"),
         soil_map.get("franco"),
@@ -179,20 +252,20 @@ def get_soil_ids() -> list[str]:
     ]
 
 # =============================================================================
-# PASO 1 — Usuario
+# PASO 1: Usuario
 # =============================================================================
 
-def setup_user(client) -> str:
-    step("Creando / verificando usuario de simulacion")
-    r = api_post(client, "/auth/register", {"email": USER_EMAIL, "password": USER_PASSWORD})
+def setup_user_by_email(client, email: str) -> str:
+    step(f"Creando / verificando usuario: {email}")
+    r = api_post(client, "/auth/register", {"email": email, "password": USER_PASSWORD})
     if r.status_code in (200, 201):
-        ok(f"Usuario creado: {USER_EMAIL}")
+        ok(f"Usuario creado: {email}")
     elif r.status_code in (400, 409, 422):
         info("Usuario ya existe, haciendo login...")
     else:
         bail("Error al registrar usuario", r)
 
-    r = api_post(client, "/auth/login", {"email": USER_EMAIL, "password": USER_PASSWORD})
+    r = api_post(client, "/auth/login", {"email": email, "password": USER_PASSWORD})
     if r.status_code != 200:
         bail("Login fallido", r)
     token = r.json()["access_token"]
@@ -201,17 +274,17 @@ def setup_user(client) -> str:
     return token
 
 # =============================================================================
-# PASO 2 — 2 Fincas con región
+# PASO 2: 2 Fincas con región
 # =============================================================================
 
-def setup_farms(client, region_ids: dict[str, str]) -> dict[str, str]:
+def setup_farms_dynamic(client, farms_def, region_ids: dict[str, str]) -> dict[str, str]:
     """Returns {farm_name: farm_id}."""
-    step("Creando / verificando 2 fincas con región asignada")
+    step("Creando / verificando fincas con región asignada")
     r = api_get(client, "/farms")
     existing = {f["name"]: f for f in (r.json() if r.status_code == 200 else [])}
 
     farm_ids = {}
-    for farm_def in FARMS_DEF:
+    for farm_def in farms_def:
         name  = farm_def["name"]
         rcode = farm_def["region_code"]
         rid   = region_ids[rcode]
@@ -236,22 +309,23 @@ def setup_farms(client, region_ids: dict[str, str]) -> dict[str, str]:
     return farm_ids
 
 # =============================================================================
-# PASO 3 — Parcelas y dispositivos
+# PASO 3: Parcelas y dispositivos
 # =============================================================================
 
-def setup_plots(
+def setup_plots_dynamic(
     client,
+    farms_def,
     farm_ids: dict[str, str],
     crop_ids: list[str],
     soil_ids: list[str],
 ) -> list[str]:
-    """Returns plot_ids[0..9] indexed by plot index (None si falló)."""
-    step(f"Creando {N_PLOTS} parcelas (5 por finca) con management_profile y dispositivos")
+    """Returns plot_ids for this user."""
+    step(f"Creando parcelas con management_profile y dispositivos")
     random.seed(RANDOM_SEED)
 
-    plot_ids: list[str | None] = [None] * N_PLOTS
+    plot_ids: list[str] = []
 
-    for farm_def in FARMS_DEF:
+    for farm_def in farms_def:
         farm_id = farm_ids[farm_def["name"]]
         r = api_get(client, f"/farms/{farm_id}/plots")
         existing = {p["name"]: p for p in (r.json() if r.status_code == 200 else [])}
@@ -264,7 +338,7 @@ def setup_plots(
             if name in existing:
                 pid = existing[name]["id"]
                 info(f"Parcela {name} ya existe ({pid[:8]}...)")
-                plot_ids[i] = pid
+                plot_ids.append(pid)
                 continue
 
             crop_id = crop_ids[i % len(crop_ids)]
@@ -279,9 +353,9 @@ def setup_plots(
             if r.status_code not in (200, 201):
                 bail(f"Error creando parcela {name}", r)
             pid = r.json()["id"]
-            plot_ids[i] = pid
+            plot_ids.append(pid)
             ok(
-                f"Parcela {name}  finca={farm_def['name'][:14]}  "
+                f"Parcela {name}  finca={farm_def['name'][:20]}  "
                 f"perfil={profile}  ({pid[:8]}...)"
             )
 
@@ -297,11 +371,11 @@ def setup_plots(
     return plot_ids
 
 # =============================================================================
-# PASO 4 — Datos históricos: riego año móvil + cosechas por cultivo
+# PASO 4: Datos históricos: riego año móvil + cosechas por cultivo
 # =============================================================================
 
 def setup_historical_data(plot_ids: list[str | None]) -> None:
-    step("Insertando riego (año móvil 2025-07-01→2026-06-30) y cosechas por cultivo")
+    step(f"Insertando riego (año móvil {SIM_START}→{SIM_END}) y cosechas por cultivo")
 
     # Semanas dentro de la ventana
     weeks: list[date] = []
@@ -341,65 +415,191 @@ def setup_historical_data(plot_ids: list[str | None]) -> None:
             f"{yld}, {water_consumed}, now(), now()) ON CONFLICT DO NOTHING;"
         )
 
-    sql_block = "\n".join(sqls)
-    result = subprocess.run(
-        ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro", "-d", "agrocollective", "-c", sql_block],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        warn(f"Algunos inserts fallaron (puede ser normal si ya existen): {result.stderr[:300]}")
-    else:
-        active = sum(1 for p in plot_ids if p is not None)
-        ok(
-            f"{len(sqls)} registros  "
-            f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            for sql in sqls:
+                db.execute(text(sql))
+            db.commit()
+            active = sum(1 for p in plot_ids if p is not None)
+            ok(
+                f"{len(sqls)} registros  "
+                f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+            )
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+    except Exception:
+        sql_block = "\n".join(sqls)
+        result = subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql_block],
+            capture_output=True, text=True,
         )
+        if result.returncode != 0:
+            warn(f"Algunos inserts fallaron (puede ser normal si ya existen): {result.stderr[:300]}")
+        else:
+            active = sum(1 for p in plot_ids if p is not None)
+            ok(
+                f"{len(sqls)} registros  "
+                f"({active} parcelas × {len(weeks)} semanas riego + 1 cosecha/parcela)"
+            )
 
 # =============================================================================
-# PASO 5 — Verificar
+# PASO 5: Verificar
 # =============================================================================
 
 def verify() -> None:
     step("Verificacion final")
-    result = subprocess.run(
-        ["docker", "exec", "agro_postgres",
-         "psql", "-U", "agro", "-d", "agrocollective", "-c",
+    sql = (
          "SELECT "
-         "(SELECT count(*) FROM farms f "
-         "  JOIN regions r ON f.region_id=r.id) AS fincas_con_region, "
-         "(SELECT count(*) FROM plots "
-         "  WHERE management_profile IS NOT NULL) AS parcelas_con_perfil, "
-         "(SELECT count(*) FROM devices WHERE is_active=true) AS dispositivos, "
+         "(SELECT count(*) FROM farms) AS fincas, "
+         "(SELECT count(*) FROM plots) AS parcelas, "
+         "(SELECT count(*) FROM devices) AS dispositivos, "
          "(SELECT count(*) FROM irrigation_records) AS registros_riego, "
          "(SELECT count(*) FROM harvests) AS cosechas, "
-         "(SELECT string_agg(DISTINCT r.code, '/' ORDER BY r.code) "
-         "  FROM farms f JOIN regions r ON f.region_id=r.id) AS regiones;"],
-        capture_output=True, text=True,
+         "(SELECT count(*) FROM users) AS usuarios;"
     )
-    print(result.stdout)
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            res = db.execute(text(sql)).first()
+            print(f"  usuarios: {res[5]}\n  fincas: {res[0]}\n  parcelas: {res[1]}\n  dispositivos: {res[2]}\n  registros_riego: {res[3]}\n  cosechas: {res[4]}")
+        finally:
+            db.close()
+    except Exception:
+        result = subprocess.run(
+            ["docker", "exec", "agro_postgres",
+             "psql", "-U", "agro", "-d", "agrocollective", "-c", sql],
+            capture_output=True, text=True,
+        )
+        print(result.stdout)
 
-# =============================================================================
-# MAIN
-# =============================================================================
+def get_simulation_dates() -> tuple[date, date]:
+    """
+    Intenta obtener el rango de fechas de clima desde InfluxDB.
+    Si InfluxDB está vacío o falla, devuelve el rango por defecto (2025-06-23 a ayer).
+    """
+    fallback_start = date(2025, 6, 23)
+    fallback_end = date.today() - timedelta(days=1)
+    
+    import os
+    try:
+        from influxdb_client import InfluxDBClient
+    except ImportError:
+        return fallback_start, fallback_end
+
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_WEATHER"]
+    if any(not os.getenv(k) for k in required):
+        return fallback_start, fallback_end
+
+    url = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token = os.environ["INFLUXDB_TOKEN"]
+    org = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_WEATHER"]
+    
+    try:
+        client = InfluxDBClient(url=url, token=token, org=org, timeout=5000)
+        try:
+            query_first = f'from(bucket: "{bucket}") |> range(start: 2025-06-23T00:00:00Z) |> filter(fn: (r) => r._measurement == "weather") |> first()'
+            query_last = f'from(bucket: "{bucket}") |> range(start: 2025-06-23T00:00:00Z) |> filter(fn: (r) => r._measurement == "weather") |> last()'
+            
+            tables_first = client.query_api().query(query_first)
+            tables_last = client.query_api().query(query_last)
+            
+            times = []
+            for t in tables_first:
+                for r in t.records:
+                    if r.get_time():
+                        times.append(r.get_time().date())
+            if not times:
+                return fallback_start, fallback_end
+            
+            start_date = min(times)
+            
+            times_end = []
+            for t in tables_last:
+                for r in t.records:
+                    if r.get_time():
+                        times_end.append(r.get_time().date())
+            end_date = max(times_end) if times_end else fallback_end
+            
+            return start_date, end_date
+        finally:
+            client.close()
+    except Exception:
+        return fallback_start, fallback_end
+
 
 def main():
-    header("AgroCollective — Setup de simulacion (Sprint 2)")
+    import argparse
+    parser = argparse.ArgumentParser(description="Setup de simulación de AgroCollective")
+    parser.add_argument("--wipe-influx", action="store_true", help="Wipe InfluxDB sensor measurements bucket")
+    args = parser.parse_args()
+
+    global SIM_START, SIM_END
+    SIM_START, SIM_END = get_simulation_dates()
+    header("AgroCollective - Setup de simulacion (Sprint 2)")
     info(f"API: {API_BASE_URL}")
-    info(f"Parcelas: {N_PLOTS}  (P00-P04 → Valencia, P05-P09 → Baza)")
+    info(f"Rango de simulación: {SIM_START} → {SIM_END}")
+    info(f"Parcelas: {N_PLOTS}  (100 parcelas divididas entre 5 usuarios)")
 
-    region_ids = get_region_ids()
-    info(f"Regiones resueltas: { {k: v[:8]+'...' for k, v in region_ids.items()} }")
+    # 1. Limpiar bases de datos primero
+    wipe_existing_data()
+    if args.wipe_influx:
+        wipe_influxdb_measurements()
+    else:
+        info("Saltando borrado de InfluxDB (no se solicitó --wipe-influx)")
 
-    crop_ids = get_crop_ids()
-    soil_ids = get_soil_ids()
+    all_plot_ids = []
 
     with httpx.Client(timeout=15) as client:
-        setup_user(client)
-        farm_ids = setup_farms(client, region_ids)
-        plot_ids = setup_plots(client, farm_ids, crop_ids, soil_ids)
+        # Resolve IDs via API inside Client context
+        region_ids = get_region_ids(client)
+        info(f"Regiones resueltas: { {k: v[:8]+'...' for k, v in region_ids.items()} }")
 
-    setup_historical_data(plot_ids)
+        crop_ids = get_crop_ids(client)
+        soil_ids = get_soil_ids(client)
+
+        for u in range(5):
+            email = f"simulacion{u}@agrocollective.com"
+            # Limpiar header de auth previo para iniciar sesión como el nuevo usuario
+            if "Authorization" in client.headers:
+                del client.headers["Authorization"]
+            
+            setup_user_by_email(client, email)
+
+            farms_def = [
+                {
+                    "name":         f"Finca Valencia {u}",
+                    "region_code":  "VALENCIA",
+                    "latitude":     39.36,
+                    "longitude":    -0.44,
+                    "area_ha":      25.0,
+                    "plot_indices": list(range(u * 20, u * 20 + 10)),
+                },
+                {
+                    "name":         f"Finca Baza {u}",
+                    "region_code":  "BAZA",
+                    "latitude":     37.49,
+                    "longitude":    -2.77,
+                    "area_ha":      25.0,
+                    "plot_indices": list(range(u * 20 + 10, u * 20 + 20)),
+                },
+            ]
+
+            farm_ids = setup_farms_dynamic(client, farms_def, region_ids)
+            plot_ids = setup_plots_dynamic(client, farms_def, farm_ids, crop_ids, soil_ids)
+            all_plot_ids.extend(plot_ids)
+
+    setup_historical_data(all_plot_ids)
     verify()
 
     header("Setup completado")

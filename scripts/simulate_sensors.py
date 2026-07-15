@@ -1,5 +1,5 @@
 """
-Simulador de sensores IoT anclado al SiAR — AgroCollective (Sprint 2).
+Simulador de sensores IoT anclado al SiAR: AgroCollective (Sprint 2).
 
 Lee datos diarios de InfluxDB measurement 'weather' (precargados por
 download_siar.py) y genera telemetría coherente con el clima real de
@@ -26,6 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import paho.mqtt.publish as mqtt_publish
+import httpx
 from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient
 
@@ -35,15 +36,15 @@ load_dotenv()
 # CONFIG
 # =============================================================================
 
-MQTT_HOST = "localhost"
-MQTT_PORT = 1883
-N_PLOTS   = 10
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+N_PLOTS   = 100
 DEVICE_PREFIX = "AGRO-P"
 SEND_DELAY_SECONDS = 0.02   # pausa entre mensajes en modo FAST
 
-# Ventana de simulación = año móvil del SiAR
-START_DATE = date(2025, 7, 1)
-END_DATE   = date(2026, 6, 30)
+# Ventana de simulación - determinada dinámicamente desde InfluxDB
+START_DATE = None
+END_DATE   = None
 
 # 6 h de cadencia → 4 lecturas por dispositivo y día
 HOURS_PER_DAY = [0, 6, 12, 18]
@@ -70,25 +71,20 @@ _SOIL_NAMES = ["arenoso", "franco-arenoso", "franco", "franco-arcilloso", "arcil
 SOIL_FALLBACK = [_SOIL_NAMES[i % len(_SOIL_NAMES)] for i in range(N_PLOTS)]
 
 # Irrigación diaria añadida (mm) por perfil de gestión
-IRRIG_MM   = {"seco_eficiente": 2.5, "moderado": 5.0, "humedo_intensivo": 9.0}
+IRRIG_MM   = {"seco_eficiente": 2.5, "moderado": 5.0, "humedo_intensivo": 9.0, "secano": 0.0}
 MM_TO_PCT  = 0.4  # mm → % (factor genérico; dry escala el lado de la ETo)
 
 # Fallback de perfil por índice cuando la BD no responde
 # (debe coincidir con MANAGEMENT_PROFILES de setup_simulation.py)
 PROFILE_FALLBACK = [
-    "seco_eficiente",   # P00
-    "moderado",         # P01
-    "moderado",         # P02
-    "seco_eficiente",   # P03
-    "humedo_intensivo", # P04
-    "moderado",         # P05
-    "seco_eficiente",   # P06
-    "humedo_intensivo", # P07
-    "moderado",         # P08
-    "humedo_intensivo", # P09
+    "seco_eficiente" if (i % 3 == 0) else "moderado" if (i % 3 == 1) else "humedo_intensivo"
+    for i in range(100)
 ]
 
-BATTERY_RANGE = (3400, 4100)
+# Rango de tensión de batería (mismo mapeo 0-100% que usa el frontend:
+# 3300mV = 0%, 4200mV = 100%). Ver device-status-card.tsx.
+BATTERY_MV_MIN = 3300
+BATTERY_MV_MAX = 4200
 
 # =============================================================================
 # Helpers BD (docker exec → psql, mismo patrón que setup_simulation.py)
@@ -106,13 +102,89 @@ def _psql(sql: str) -> str:
 
 
 def _psql_rows(sql: str) -> list[list[str]]:
-    out = _psql(sql)
-    rows = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if parts and parts[0]:
-            rows.append(parts)
-    return rows
+    try:
+        from app.database.postgres import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            result = db.execute(text(sql))
+            return [[str(val) for val in row] for row in result.all()]
+        finally:
+            db.close()
+    except Exception:
+        out = _psql(sql)
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if parts and parts[0]:
+                rows.append(parts)
+        return rows
+
+
+def load_simulation_config_from_api() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """
+    Consulta la API REST del backend para construir los mapas device_station,
+    device_profile y device_soil dinámicamente sin usar queries SQL directas.
+    """
+    email = "simulacion@agrocollective.com"
+    password = "Simul2026!"
+    base_url = "http://localhost:8000"
+    
+    headers = {}
+    print("  Conectando a la API para resolver mapeos de dispositivos...")
+    with httpx.Client(timeout=15) as client:
+        try:
+            r = client.post(f"{base_url}/auth/login", json={"email": email, "password": password})
+            if r.status_code != 200:
+                print("  [WARN] Login de API fallido. Usando fallbacks de base de datos.")
+                return {}, {}, {}
+            token = r.json()["access_token"]
+            headers["Authorization"] = f"Bearer {token}"
+            
+            # Obtener catálogo de regiones (para código de estación SiAR)
+            r = client.get(f"{base_url}/regions")
+            regions = {item["id"]: item["siar_station_code"] for item in r.json() if "siar_station_code" in item}
+            
+            # Obtener catálogo de suelos (para nombre de suelo)
+            r = client.get(f"{base_url}/soils")
+            soils = {item["id"]: item["name"] for item in r.json()}
+            
+            # Obtener fincas
+            r = client.get(f"{base_url}/farms", headers=headers)
+            farms = r.json()
+            
+            device_station = {}
+            device_profile = {}
+            device_soil = {}
+            
+            for farm in farms:
+                farm_id = farm["id"]
+                region_id = farm.get("region_id")
+                station = regions.get(region_id, "V17")
+                
+                # Obtener parcelas
+                r = client.get(f"{base_url}/farms/{farm_id}/plots", headers=headers)
+                plots = r.json()
+                for plot in plots:
+                    plot_id = plot["id"]
+                    profile = plot.get("management_profile", "moderado")
+                    soil_id = plot.get("soil_id")
+                    soil_name = soils.get(soil_id, "franco")
+                    
+                    # Obtener dispositivo de la parcela
+                    r = client.get(f"{base_url}/plots/{plot_id}/devices", headers=headers)
+                    if r.status_code == 200:
+                        device = r.json()
+                        if device and device.get("is_active"):
+                            code = device["code"]
+                            device_station[code] = station
+                            device_profile[code] = profile
+                            device_soil[code] = soil_name
+            
+            return device_station, device_profile, device_soil
+        except Exception as e:
+            print(f"  [WARN] Error al consultar API ({type(e).__name__}): {e}. Usando fallbacks de base de datos.")
+            return {}, {}, {}
 
 
 def load_device_station_map() -> dict[str, str]:
@@ -183,13 +255,15 @@ def load_soil_type_map() -> dict[str, str]:
 # =============================================================================
 
 
-def load_weather_data() -> dict[str, dict[date, dict]]:
+def load_weather_data() -> tuple[dict[str, dict[date, dict]], date, date]:
     """
-    Devuelve {station_code: {day: {field: float}}} para toda la ventana.
+    Devuelve (weather, start_date, end_date).
+    weather es {station_code: {day: {field: float}}} para toda la ventana.
     Usa pivot() para obtener todos los campos de 'weather' en una sola query.
+    Determina start_date y end_date dinámicamente según los timestamps de los registros.
     """
     required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
-                "INFLUXDB_ORG", "INFLUXDB_BUCKET"]
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_WEATHER"]
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         print(f"[ERR] Variables de entorno InfluxDB faltantes: {', '.join(missing)}")
@@ -198,11 +272,11 @@ def load_weather_data() -> dict[str, dict[date, dict]]:
     url    = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
     token  = os.environ["INFLUXDB_TOKEN"]
     org    = os.environ["INFLUXDB_ORG"]
-    bucket = os.environ["INFLUXDB_BUCKET"]
+    bucket = os.environ["INFLUXDB_BUCKET_WEATHER"]
 
     flux = f'''
 from(bucket: "{bucket}")
-  |> range(start: 2025-07-01T00:00:00Z, stop: 2026-07-01T00:00:00Z)
+  |> range(start: 2025-06-23T00:00:00Z)
   |> filter(fn: (r) => r._measurement == "weather")
   |> pivot(
        rowKey:    ["_time", "siar_station_code"],
@@ -224,18 +298,27 @@ from(bucket: "{bucket}")
     )
 
     weather: dict[str, dict[date, dict]] = {}
+    all_dates = []
     for table in tables:
         for rec in table.records:
             station = rec.values.get("siar_station_code", "")
             if not station:
                 continue
             day = rec.get_time().date()
+            all_dates.append(day)
             row = {f: float(rec.values[f]) for f in FIELDS if rec.values.get(f) is not None}
             weather.setdefault(station, {})[day] = row
 
+    if not all_dates:
+        print("\n[ERR] No se encontraron datos meteorológicos en InfluxDB. Corre download_siar.py primero.")
+        sys.exit(1)
+
+    start_date = min(all_dates)
+    end_date = max(all_dates)
+
     summary = ", ".join(f"{k}:{len(v)}d" for k, v in weather.items())
     print(f" {sum(len(v) for v in weather.values())} registros ({summary})")
-    return weather
+    return weather, start_date, end_date
 
 
 # =============================================================================
@@ -272,6 +355,11 @@ class SensorSimulator:
         self._dry  = soil["dry"]  # factor de secado por ETo
         self._sh   = self._wp + (self._fc - self._wp) * 0.75  # nivel inicial: 75% del agua disponible
         self._last_day: date | None = None
+        # Cada dispositivo arranca en un punto distinto de su ciclo de descarga
+        # (offset determinista por plot_index, 10-100%) en vez de todos a 100%,
+        # para que no decaigan en paralelo mostrando el mismo % en todo momento.
+        self._battery_pct: float = 100.0 - ((plot_index * 7) % 90)
+        self._battery_ts: datetime | None = None
 
     def _step_water_balance(self, day: date, w: dict) -> None:
         """Balance hídrico diario: llamar una vez por día antes de generar lecturas."""
@@ -281,17 +369,50 @@ class SensorSimulator:
         eto    = w.get("eto", 3.0)
         precip = w.get("precipitation", 0.0)
         irrig  = IRRIG_MM.get(self.profile, 5.0)
+
+        # Inyectar fallos físicos en la simulación de riego (anomalías dinámicas)
+        if self.plot_index == 3:
+            # Parcela 3: Riego deficitario severo (20% del riego normal). Se seca dinámicamente con ETo.
+            irrig = 0.2 * IRRIG_MM.get(self.profile, 5.0)
+        elif self.plot_index == 7:
+            # Parcela 7: Exceso de riego continuo (doble del riego normal).
+            irrig = 2.0 * IRRIG_MM.get(self.profile, 5.0)
+
         # STOCK: delta modifica el nivel previo; ETo escala por tipo de suelo
         delta  = (precip * 0.8 + irrig * 0.9 - eto * self._dry) * MM_TO_PCT
-        # Acotar entre WP y FC del suelo de la parcela (límites físicos)
-        self._sh = max(self._wp, min(self._fc, self._sh + delta))
+        
+        # Ajustar límites físicos de acumulación de agua según el tipo de anomalía
+        if self.plot_index == 3:
+            # Límite inferior ligeramente expandido por debajo del punto de marchitez
+            self._sh = max(self._wp - 1.5, min(self._fc, self._sh + delta))
+        elif self.plot_index == 7:
+            # Límite superior ligeramente expandido por encima de la capacidad de campo
+            self._sh = max(self._wp, min(self._fc + 3.0, self._sh + delta))
+        else:
+            self._sh = max(self._wp, min(self._fc, self._sh + delta))
+
+    def _step_battery(self, ts: datetime) -> int:
+        """Descarga lineal de 1%/hora desde la última lectura; al llegar al
+        10% se considera reemplazada/recargada y vuelve al 100% de golpe,
+        simulando el cambio físico de batería de un nodo real (no es un
+        envolvente continuo por los valores bajos)."""
+        elapsed_hours = 0.0 if self._battery_ts is None else max(
+            0.0, (ts - self._battery_ts).total_seconds() / 3600
+        )
+        self._battery_ts = ts
+        self._battery_pct -= elapsed_hours
+        if self._battery_pct <= 10:
+            self._battery_pct = 100.0
+
+        mv_range = BATTERY_MV_MAX - BATTERY_MV_MIN
+        return round(BATTERY_MV_MIN + (self._battery_pct / 100) * mv_range)
 
     def next_reading(self, ts: datetime, day_weather: dict) -> dict:
         day = ts.date()
         self._step_water_balance(day, day_weather)
         hour = ts.hour
 
-        # Temperatura del aire — curva sinusoidal anclada a max/min del día
+        # Temperatura del aire: curva sinusoidal anclada a max/min del día
         t_mean = day_weather.get("air_temp", 20.0)
         t_max  = day_weather.get("air_temp_max",  t_mean + 5.0)
         t_min  = day_weather.get("air_temp_min",  t_mean - 5.0)
@@ -299,7 +420,7 @@ class SensorSimulator:
             _diurnal_temp(hour, t_min, t_max) + random.gauss(0, 0.3), 2
         )
 
-        # Humedad del aire — anti-fase, anclada a max/min del día
+        # Humedad del aire: anti-fase, anclada a max/min del día
         h_mean = day_weather.get("relative_humidity", 60.0)
         h_max  = day_weather.get("relative_humidity_max", min(100.0, h_mean + 10.0))
         h_min  = day_weather.get("relative_humidity_min", max(10.0,  h_mean - 10.0))
@@ -309,7 +430,7 @@ class SensorSimulator:
             2,
         )
 
-        # Temperatura del suelo — media diaria SiAR + oscilación retardada ~3h respecto al aire
+        # Temperatura del suelo: media diaria SiAR + oscilación retardada ~3h respecto al aire
         # cos(hour-18): pico ~18h (3h después del pico del aire a las 15h)
         s_mean    = day_weather.get("soil_temp", t_mean - 2.0)
         soil_temp = round(
@@ -319,13 +440,24 @@ class SensorSimulator:
             2,
         )
 
-        # Humedad del suelo — oscilación intra-día sobre el nivel diario (STOCK)
-        # Acotada a [WP, FC] del suelo; los outliers se aplican DESPUÉS, fuera del rango
+        # Humedad del suelo: oscilación intra-día sobre el nivel diario (STOCK)
+        # Acotada al rango físico ajustado de la parcela
+        wp_limit = self._wp - 1.5 if self.plot_index == 3 else self._wp
+        fc_limit = self._fc + 3.0 if self.plot_index == 7 else self._fc
         soil_hum = round(
-            max(self._wp, min(self._fc, self._sh + random.gauss(0, 0.4))), 2
+            max(wp_limit, min(fc_limit, self._sh + random.gauss(0, 0.4))), 2
         )
 
-        battery = int(random.uniform(*BATTERY_RANGE))
+        # Inyectar anomalías de sensor/microclima para cubrir todas las variables medidas
+        if self.plot_index == 1:
+            # Parcela 1: Anomalía de temperatura (ej. calor local / mala ubicación del sensor)
+            air_temp = round(air_temp + 4.5, 2)
+            soil_temp = round(soil_temp + 3.5, 2)
+        elif self.plot_index == 5:
+            # Parcela 5: Anomalía de humedad del aire (ej. sensor descalibrado, lectura baja)
+            air_hum = round(max(10.0, air_hum - 20.0), 2)
+
+        battery = self._step_battery(ts)
 
         return {
             "device_id":  self.device_code,
@@ -404,9 +536,39 @@ def send_message(payload: dict, dry_run: bool) -> None:
 # =============================================================================
 
 
+def ensure_bucket_exists() -> None:
+    """Asegura que el bucket de mediciones de InfluxDB exista."""
+    required = ["INFLUXDB_HOST", "INFLUXDB_PORT", "INFLUXDB_TOKEN",
+                "INFLUXDB_ORG", "INFLUXDB_BUCKET_MEASUREMENTS"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        return
+
+    url    = f"http://{os.environ['INFLUXDB_HOST']}:{os.environ['INFLUXDB_PORT']}"
+    token  = os.environ["INFLUXDB_TOKEN"]
+    org    = os.environ["INFLUXDB_ORG"]
+    bucket = os.environ["INFLUXDB_BUCKET_MEASUREMENTS"]
+
+    client = InfluxDBClient(url=url, token=token, org=org)
+    try:
+        buckets_api = client.buckets_api()
+        existing = buckets_api.find_bucket_by_name(bucket)
+        if not existing:
+            orgs_api = client.organizations_api()
+            orgs = orgs_api.find_organizations(org=org)
+            if orgs:
+                buckets_api.create_bucket(bucket_name=bucket, org_id=orgs[0].id)
+                print(f"  [INFO] Creado bucket de InfluxDB '{bucket}'.")
+    except Exception as exc:
+        print(f"  [WARN] No se pudo verificar/crear el bucket '{bucket}': {exc}")
+    finally:
+        client.close()
+
+
 def main() -> None:
+    ensure_bucket_exists()
     parser = argparse.ArgumentParser(
-        description="Simulador de sensores AgroCollective (Sprint 2 — SiAR-anclado)"
+        description="Simulador de sensores AgroCollective (Sprint 2, SiAR-anclado)"
     )
     parser.add_argument("--realtime", action="store_true",
                         help="Espera 6 h reales entre ciclos (modo continuo)")
@@ -419,15 +581,17 @@ def main() -> None:
     args = parser.parse_args()
     random.seed(args.seed)
 
-    print("\n=== AgroCollective — Simulador SiAR-anclado (Sprint 2) ===")
+    print("\n=== AgroCollective - Simulador SiAR-anclado (Sprint 2) ===")
 
-    # Resolver device→estación, perfil y tipo de suelo desde BD (con fallback)
-    device_station = load_device_station_map()
-    device_profile = load_management_profile_map()
-    device_soil    = load_soil_type_map()
+    # Resolver device→estación, perfil y tipo de suelo desde API (con fallback a SQL)
+    device_station, device_profile, device_soil = load_simulation_config_from_api()
+    if not device_station:
+        device_station = load_device_station_map()
+        device_profile = load_management_profile_map()
+        device_soil    = load_soil_type_map()
 
     # Cargar datos climáticos de InfluxDB
-    weather = load_weather_data()
+    weather, START_DATE, END_DATE = load_weather_data()
 
     # Construir simuladores
     simulators = []
@@ -441,8 +605,9 @@ def main() -> None:
         print(f"  {code}  estacion={station}  perfil={profile}  "
               f"suelo={soil}  WP={sp['WP']}%  FC={sp['FC']}%")
 
-    days        = [START_DATE + timedelta(days=d)
+    all_days    = [START_DATE + timedelta(days=d)
                    for d in range((END_DATE - START_DATE).days + 1)]
+    days        = all_days[-45:]
     total_msgs  = len(days) * len(HOURS_PER_DAY) * N_PLOTS
 
     print(f"\n  Ventana:     {START_DATE} → {END_DATE}  ({len(days)} días)")

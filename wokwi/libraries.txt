@@ -3,3 +3,5 @@ PubSubClient
 OneWire
 DallasTemperature
 ArduinoJson
+Adafruit BMP280 Library
+Adafruit Unified Sensor

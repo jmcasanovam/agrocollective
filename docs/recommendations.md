@@ -1,4 +1,4 @@
-# Fase 9 — Generación de Recomendaciones Inteligentes
+# Fase 9: Generación de Recomendaciones Inteligentes
 
 ## Objetivo
 
@@ -10,17 +10,17 @@ Sintetizar los resultados de las fases anteriores para producir **recomendacione
 
 | Fase | Qué aporta |
 |---|---|
-| Fase 4 — K-Means | Estadísticas medias del cluster (benchmark de referencia) |
-| Fase 5 — LOF | Detección de anomalías y features afectadas |
-| Fase 6 — Causal | Causa probable de cada anomalía (correlación de Pearson) |
-| Fase 7 — Análogas | Parcelas similares con mejores resultados (referencia práctica) |
-| Fase 8 — ML | Predicción de rendimiento y eficiencia hídrica esperados |
+| Fase 4: K-Means | Estadísticas medias del cluster (benchmark de referencia) |
+| Fase 5: LOF | Detección de anomalías y features afectadas |
+| Fase 6: Causal | Causa probable de cada anomalía (correlación de Pearson) |
+| Fase 7: Análogas | Parcelas similares con mejores resultados (referencia práctica) |
+| Fase 8: ML | Predicción de rendimiento y eficiencia hídrica esperados |
 
 ---
 
 ## Categorías de recomendación
 
-### `anomaly` — Anomalía detectada
+### `anomaly`: Anomalía detectada
 
 Se genera una recomendación por cada **feature anómala** identificada en la Fase 5.
 
@@ -35,7 +35,7 @@ Se genera una recomendación por cada **feature anómala** identificada en la Fa
 
 ---
 
-### `prediction` — Brecha respecto al potencial ML
+### `prediction`: Brecha respecto al potencial ML
 
 Se genera cuando el valor **observado** de `yield_kg_ha` o `water_efficiency` está por debajo de la **predicción del modelo** en un margen relevante.
 
@@ -51,7 +51,7 @@ Se genera cuando el valor **observado** de `yield_kg_ha` o `water_efficiency` es
 
 ---
 
-### `benchmark` — Comparación con la media del cluster
+### `benchmark`: Comparación con la media del cluster
 
 Se compara la parcela contra la **media del cluster K-Means** en tres dimensiones clave: eficiencia hídrica, humedad del suelo y volumen de riego. Solo se genera si la brecha supera el 10 %.
 

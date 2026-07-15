@@ -61,7 +61,7 @@ class AnalogueService:
         """
         n = len(aggregates)
         if n < 2:
-            logger.info("[Fase 7] Menos de 2 parcelas — sin análogas que calcular.")
+            logger.info("[Fase 7] Menos de 2 parcelas, sin análogas que calcular.")
             return []
 
         run_date = clustering_result.run_date

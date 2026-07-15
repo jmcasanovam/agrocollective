@@ -5,10 +5,10 @@ Uso:
     python scripts/test_mqtt_flow.py
 
 Opciones del menú:
-    1 — Crear usuario + setup completo (finca/parcela/dispositivo) + publicar
-    2 — Login y publicar lectura (crea lo que falte automáticamente)
-    3 — Login y leer últimos datos registrados del dispositivo
-    4 — Salir
+    1. Crear usuario + setup completo (finca/parcela/dispositivo) + publicar
+    2. Login y publicar lectura (crea lo que falte automáticamente)
+    3. Login y leer últimos datos registrados del dispositivo
+    4. Salir
 
 Requisitos:
     - docker-compose up en marcha (backend, postgres, influxdb, mosquitto)
@@ -24,7 +24,7 @@ import httpx
 import paho.mqtt.publish as publish
 
 # =============================================================================
-# VARIABLES DE CONFIGURACIÓN — modifica aquí antes de ejecutar
+# VARIABLES DE CONFIGURACIÓN: modifica aquí antes de ejecutar
 # =============================================================================
 
 # Dentro del contenedor Docker el broker se llama "mosquitto".
@@ -148,10 +148,10 @@ def _get_or_create_catalog(client: httpx.Client) -> tuple[str, str, str | None]:
     """Devuelve (crop_id, soil_id, region_id). Falla si el catálogo está vacío."""
     crops = api_get(client, "/crops")
     if not crops:
-        bail("Sin cultivos en el catálogo — ejecuta: python scripts/seed_data.py")
+        bail("Sin cultivos en el catálogo. Ejecuta: python scripts/seed_data.py")
     soils = api_get(client, "/soils")
     if not soils:
-        bail("Sin tipos de suelo — ejecuta: python scripts/seed_data.py")
+        bail("Sin tipos de suelo. Ejecuta: python scripts/seed_data.py")
     regions = api_get(client, "/regions")
     return crops[0]["id"], soils[0]["id"], (regions[0]["id"] if regions else None)
 
@@ -179,15 +179,15 @@ def ensure_setup(client: httpx.Client) -> None:
 
     device, _ = _find_device(client)
     if device:
-        ok(f"Dispositivo '{DEVICE_CODE}' ya existe — no es necesario crear nada.")
+        ok(f"Dispositivo '{DEVICE_CODE}' ya existe. No es necesario crear nada.")
         return
 
     info("Dispositivo no encontrado. Creando recursos necesarios...")
 
     crop_id, soil_id, region_id = _get_or_create_catalog(client)
-    ok(f"Catálogo OK — cultivo={crop_id[:8]}... suelo={soil_id[:8]}...")
+    ok(f"Catálogo OK: cultivo={crop_id[:8]}... suelo={soil_id[:8]}...")
 
-    # Finca — reutilizar la primera si ya existe
+    # Finca: reutilizar la primera si ya existe
     farms = api_get(client, "/farms")
     if farms:
         farm_id = farms[0]["id"]
@@ -203,7 +203,7 @@ def ensure_setup(client: httpx.Client) -> None:
         farm_id = farm["id"]
         ok(f"Finca creada: {FARM_NAME} ({farm_id})")
 
-    # Parcela — reutilizar la primera de esa finca si ya existe
+    # Parcela: reutilizar la primera de esa finca si ya existe
     plots = api_get(client, f"/farms/{farm_id}/plots")
     if plots:
         plot_id = plots[0]["id"]
@@ -216,7 +216,7 @@ def ensure_setup(client: httpx.Client) -> None:
             "area_ha": PLOT_AREA_HA,
         })
         plot_id = plot["id"]
-        ok(f"Parcela creada: {PLOT_NAME} (hash={plot.get('hash_plot', '—')[:12]}...)")
+        ok(f"Parcela creada: {PLOT_NAME} (hash={plot.get('hash_plot', 'N/D')[:12]}...)")
 
     # Dispositivo
     device = api_post(client, f"/plots/{plot_id}/devices", {"code": DEVICE_CODE})
@@ -246,7 +246,7 @@ def do_publish() -> None:
 
 
 def do_read(client: httpx.Client) -> None:
-    step(f"Últimos datos registrados — dispositivo '{DEVICE_CODE}'")
+    step(f"Últimos datos registrados: dispositivo '{DEVICE_CODE}'")
 
     device, plot = _find_device(client)
 
@@ -262,17 +262,17 @@ def do_read(client: httpx.Client) -> None:
     print(f"  {'Activo':<22} {'Sí' if device['is_active'] else 'No'}")
     print(f"  {'Parcela':<22} {plot['name']}  (id: {plot['id'][:8]}...)")
 
-    hash_plot = plot.get("hash_plot") or "—"
+    hash_plot = plot.get("hash_plot") or "N/D"
     print(f"  {'hash_plot (InfluxDB)':<22} {hash_plot[:20]}...")
     print(f"  {'Última lectura':<22} {device.get('last_seen_at') or '(sin datos aún)'}")
-    print(f"  {'Batería':<22} {device.get('battery_mv') or '—'} mV")
+    print(f"  {'Batería':<22} {device.get('battery_mv') or 'N/D'} mV")
 
     print()
     info("Query Flux para ver los puntos en InfluxDB Data Explorer:")
     info('  from(bucket: "agrocollective")')
     info('    |> range(start: -1h)')
     info('    |> filter(fn: (r) => r._measurement == "measurements")')
-    if hash_plot != "—":
+    if hash_plot != "N/D":
         info(f'    |> filter(fn: (r) => r.hash_plot == "{hash_plot}")')
 
 
@@ -290,7 +290,7 @@ MENU = """
 
 
 def main() -> None:
-    header("AgroCollective — Test MQTT interactivo (Fases 1 + 2)")
+    header("AgroCollective - Test MQTT interactivo (Fases 1 + 2)")
     info(f"API : {API_BASE_URL}")
     info(f"MQTT: {MQTT_HOST}:{MQTT_PORT}")
 
@@ -299,7 +299,7 @@ def main() -> None:
         opcion = input("\n  Elige una opción: ").strip()
 
         if opcion == "1":
-            header("Opción 1 — Setup completo + publicar")
+            header("Opción 1: Setup completo + publicar")
             with httpx.Client(timeout=10.0) as client:
                 do_register(client)
                 token = do_login(client)
@@ -308,7 +308,7 @@ def main() -> None:
             do_publish()
 
         elif opcion == "2":
-            header("Opción 2 — Login y publicar")
+            header("Opción 2: Login y publicar")
             with httpx.Client(timeout=10.0) as client:
                 token = do_login(client)
                 client.headers["Authorization"] = f"Bearer {token}"
@@ -316,7 +316,7 @@ def main() -> None:
             do_publish()
 
         elif opcion == "3":
-            header("Opción 3 — Login y leer datos")
+            header("Opción 3: Login y leer datos")
             with httpx.Client(timeout=10.0) as client:
                 token = do_login(client)
                 client.headers["Authorization"] = f"Bearer {token}"

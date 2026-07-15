@@ -84,7 +84,7 @@ def main():
         print(f"Crops:    {_upsert(db, Crop, 'name', CROPS)} nuevas")
         removed = _remove_crops(db, ["naranjo", "tomate"])
         if removed:
-            print(f"Crops:    {removed} eliminadas (naranjo, tomate — fuera del MVP)")
+            print(f"Crops:    {removed} eliminadas (naranjo, tomate, fuera del MVP)")
         print(f"Soils:    {_upsert(db, Soil, 'name', SOILS)} nuevas")
         print("Seed completado.")
     finally:

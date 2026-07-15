@@ -115,7 +115,6 @@ site
 
 # IDEs and editors
 .idea/
-.vscode/
 *.sublime-workspace
 *.sublime-project
 
@@ -150,7 +149,6 @@ docker-compose.*.yml
 
 */sucio.md.agents/
 skills-lock.*
-
 # Frontend and Node dependencies
 node_modules/
 .next/
@@ -161,7 +159,17 @@ node_modules/
 # Agent/Claude configs
 AGENTS.md
 CLAUDE.md
+frontend/AGENTS.md
+frontend/CLAUDE.md
 
 # Simulation ground truth
 outliers_ground_truth.jsonl
+
+# Frontend unignores
+!frontend/src/lib/
+!frontend/.env.example
+
+# Claude Code project config (local only, not shared)
+.claude/
+
 
