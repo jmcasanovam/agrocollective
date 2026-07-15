@@ -13,7 +13,7 @@
     {
       "type": "wokwi-dht22",
       "id": "dht1",
-      "top": -60,
+      "top": -80,
       "left": 300,
       "attrs": {
         "temperature": "22.5",
@@ -23,7 +23,7 @@
     {
       "type": "wokwi-ds18b20",
       "id": "ds1",
-      "top": 100,
+      "top": 40,
       "left": 310,
       "attrs": {
         "temperature": "19.5"
@@ -32,7 +32,7 @@
     {
       "type": "wokwi-resistor",
       "id": "r1",
-      "top": 80,
+      "top": 20,
       "left": 390,
       "rotate": 90,
       "attrs": {
@@ -42,10 +42,19 @@
     {
       "type": "soil-moisture-sensor",
       "id": "soil1",
-      "top": 230,
+      "top": 170,
       "left": 300,
       "attrs": {
         "moisture": "45"
+      }
+    },
+    {
+      "type": "wokwi-bmp280",
+      "id": "bmp1",
+      "top": 260,
+      "left": 300,
+      "attrs": {
+        "pressure": "1013.25"
       }
     }
   ],
@@ -62,6 +71,11 @@
 
     ["esp:3V3",   "soil1:VCC",  "red",    []],
     ["esp:GND.1", "soil1:GND",  "black",  []],
-    ["esp:34",    "soil1:AOUT", "yellow", []]
+    ["esp:34",    "soil1:AOUT", "yellow", []],
+
+    ["esp:3V3",   "bmp1:VCC", "red",    []],
+    ["esp:GND.1", "bmp1:GND", "black",  []],
+    ["esp:D22",   "bmp1:SCL", "blue",   []],
+    ["esp:D21",   "bmp1:SDA", "yellow", []]
   ]
 }
